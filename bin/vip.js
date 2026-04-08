@@ -929,10 +929,25 @@ program.command('init')
 
       const deps = [
         { name: 'bird', label: 'Bird CLI (Twitter data)', install: 'npm install -g @steipete/bird', check: () => checkTool('bird') },
-        { name: 'ddgs', label: 'DDGS (web search)', install: 'pip3 install ddgs', check: () => checkTool('ddgs') || fs.existsSync(path.join(os.homedir(), 'Library', 'Python', '3.9', 'bin', 'ddgs')) },
+        { name: 'ddgs', label: 'DDGS (web search)', install: 'pip3 install ddgs', check: () => {
+          if (checkTool('ddgs')) return true;
+          // Check common Python bin paths
+          const pyDirs = fs.readdirSync(path.join(os.homedir(), 'Library', 'Python')).catch?.(() => []);
+          try {
+            for (const d of fs.readdirSync(path.join(os.homedir(), 'Library', 'Python'))) {
+              if (fs.existsSync(path.join(os.homedir(), 'Library', 'Python', d, 'bin', 'ddgs'))) return true;
+            }
+          } catch {}
+          try { execFileSync('python3', ['-c', 'import ddgs'], { stdio: 'ignore', timeout: 5000 }); return true; } catch {}
+          return false;
+        }},
         { name: 'claude', label: 'Claude Code CLI (AI synthesis)', install: 'npm install -g @anthropic-ai/claude-code', check: () => checkTool('claude') },
         { name: 'yt-dlp', label: 'yt-dlp (YouTube download)', install: 'pip3 install yt-dlp', check: () => checkTool('yt-dlp') },
-        { name: 'whisper', label: 'Whisper (YouTube transcription)', install: 'pip3 install openai-whisper', check: () => checkTool('whisper') },
+        { name: 'whisper', label: 'Whisper (YouTube transcription)', install: 'pip3 install openai-whisper', check: () => {
+          if (checkTool('whisper')) return true;
+          try { execFileSync('python3', ['-c', 'import whisper'], { stdio: 'ignore', timeout: 5000 }); return true; } catch {}
+          return false;
+        }},
       ];
 
       const missing = [];
