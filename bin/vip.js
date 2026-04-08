@@ -477,13 +477,18 @@ program.command('card')
   .description('Generate and serve H5 baseball card page')
   .option('-o, --output <path>', 'Output HTML file', 'web/index.html')
   .option('-p, --port <port>', 'Server port', '3000')
+  .option('-w, --watch', 'Watch profile files and auto-regenerate')
   .option('--no-serve', 'Only generate, do not start server')
   .action(async (opts) => {
-    console.log(c.cyan('Generating baseball cards...'));
-    const profiles = listProfiles();
-    if (!profiles.length) { console.log(c.dim('No profiles. Use "vip add" first.')); return; }
+    function regenerate() {
+      const profiles = listProfiles();
+      if (!profiles.length) return null;
+      return generateCards(profiles, opts.output);
+    }
 
-    const outputPath = generateCards(profiles, opts.output);
+    console.log(c.cyan('Generating baseball cards...'));
+    const outputPath = regenerate();
+    if (!outputPath) { console.log(c.dim('No profiles. Use "vip add" first.')); return; }
     console.log(c.green(`Cards generated: ${outputPath}`));
 
     if (opts.serve === false) {
@@ -508,8 +513,20 @@ program.command('card')
     server.listen(port, () => {
       const url = `http://localhost:${port}`;
       console.log(c.green(`\nServer running at ${c.bold(url)}`));
+
+      // Watch profiles dir for changes
+      if (opts.watch) {
+        const profilesDir = getProfilesDir();
+        console.log(c.dim(`Watching ${profilesDir} for changes...`));
+        fs.watch(profilesDir, { recursive: false }, (event, filename) => {
+          if (!filename?.endsWith('.md')) return;
+          console.log(c.dim(`  ${filename} changed, regenerating...`));
+          regenerate();
+        });
+        console.log(c.dim('Edit a .md profile file and the cards will auto-update.'));
+      }
+
       console.log(c.dim('Press Ctrl+C to stop\n'));
-      // Auto-open in browser
       try { execFileSync('open', [url], { stdio: 'ignore' }); } catch {}
     });
   });

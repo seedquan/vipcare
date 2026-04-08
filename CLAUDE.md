@@ -12,7 +12,7 @@ CLI tool that auto-builds VIP person profiles from Twitter, LinkedIn, and web se
 ```
 bin/vip.js              — CLI entry point, all command definitions
 lib/
-  config.js             — Config loading (~/.vip-crm/config.json), tool checks
+  config.js             — Config loading (~/.vip/config.json), tool checks
   profile.js            — CRUD for profile Markdown files in profiles/
   resolver.js           — Parse input (name vs URL) into person object
   fetchers/
@@ -43,7 +43,7 @@ Input flows through a pipeline: **resolver** parses the input (name or URL) into
 - ESM modules (`"type": "module"` in package.json)
 - Tests use node:test built-in runner with assert
 - Profile data stored as Markdown files in profiles/
-- Config at ~/.vip-crm/config.json
+- Config at ~/.vip/config.json
 - AI backends: Claude CLI, Anthropic API, GitHub Copilot (auto-detected in that order)
 
 ## Adding a New Command

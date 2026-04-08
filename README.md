@@ -123,4 +123,4 @@ vip digest           # View recent changes
 vip config           # View settings
 ```
 
-Settings: `~/.vip-crm/config.json` | Profiles: `~/Projects/vip-crm/profiles/`
+Settings: `~/.vip/config.json` | Profiles: `~/Projects/vip-crm/profiles/`

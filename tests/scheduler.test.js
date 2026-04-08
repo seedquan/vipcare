@@ -8,7 +8,7 @@ describe('createPlist', () => {
     try {
       const plist = createPlist(12);
       assert.ok(plist.includes('<integer>43200</integer>'));
-      assert.ok(plist.includes('com.vip-crm.monitor'));
+      assert.ok(plist.includes('com.vipcare.monitor'));
       assert.ok(plist.includes('monitor'));
     } catch (e) {
       if (e.message.includes("Cannot find 'vip'")) {
