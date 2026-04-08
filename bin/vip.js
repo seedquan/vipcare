@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import fs from 'fs';
 import os from 'os';
+import readline from 'readline/promises';
 import { execFileSync } from 'child_process';
 import { checkTool, getProfilesDir, loadConfig, saveConfig } from '../lib/config.js';
 import { deleteProfile, getProfilePath, listProfiles, loadProfile, profileExists, saveProfile, searchProfiles, slugify } from '../lib/profile.js';
@@ -75,7 +76,7 @@ try {
 } catch {}
 
 const program = new Command();
-program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.2.0');
+program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.3.0');
 
 // --- add ---
 program.command('add')
@@ -743,6 +744,58 @@ program.command('config')
     console.log(`  Monitor interval: ${cfg.monitor_interval_hours}h`);
     console.log(`  Bird CLI: ${checkTool('bird') ? c.green('available') : c.red('not found')}`);
     console.log(`  AI backend: ${(() => { const b = getBackendName(); return b !== 'none' ? c.green(b) : c.red('not found'); })()}`);
+  });
+
+// --- init ---
+program.command('init')
+  .description('Interactive first-time setup for VIPCare')
+  .action(async () => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    try {
+      console.log(c.bold(c.cyan('\nWelcome to VIPCare!\n')));
+
+      const defaultDir = path.join(os.homedir(), 'Projects', 'vip-crm', 'profiles');
+      const profilesAnswer = await rl.question(`Where should profiles be stored?\n  (default: ${defaultDir}) > `);
+      const profilesDir = profilesAnswer.trim() || defaultDir;
+
+      console.log(`\n${c.cyan('AI backend preference:')}`);
+      console.log('  1. Auto-detect (recommended)');
+      console.log('  2. Claude CLI');
+      console.log('  3. Anthropic API');
+      console.log('  4. GitHub Copilot CLI');
+      const backendAnswer = await rl.question('  > ');
+      const backendChoice = backendAnswer.trim() || '1';
+
+      const backendMap = { '1': 'auto', '2': 'claude-cli', '3': 'anthropic-api', '4': 'github-copilot' };
+      const aiBackend = backendMap[backendChoice] || 'auto';
+
+      const config = {
+        profiles_dir: profilesDir.replace(/^~/, os.homedir()),
+        ai_backend: aiBackend,
+      };
+
+      if (aiBackend === 'anthropic-api') {
+        const apiKey = await rl.question('\nAnthropic API key: ');
+        if (apiKey.trim()) {
+          config.anthropic_api_key = apiKey.trim();
+        }
+      }
+
+      // Merge with existing config to preserve other settings
+      let existing = {};
+      try {
+        const { loadConfig: lc } = await import('../lib/config.js');
+        existing = lc();
+      } catch {}
+      saveConfig({ ...existing, ...config });
+
+      const { CONFIG_FILE: cfgPath } = await import('../lib/config.js');
+      console.log(c.green(`\nConfig saved to ${cfgPath}`));
+      console.log(`You're ready! Try: ${c.cyan('vip add "Sam Altman" --company "OpenAI"')}\n`);
+    } finally {
+      rl.close();
+    }
   });
 
 // --- export ---
