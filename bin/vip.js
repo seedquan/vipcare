@@ -57,8 +57,29 @@ function gatherData(person) {
       rawParts.push(`=== Twitter (@${person.twitterHandle}) ===\n${data.rawOutput}`);
       sources.push(`https://twitter.com/${person.twitterHandle}`);
       saveRawSource(personSlug, `twitter_${person.twitterHandle}`, `# Twitter @${person.twitterHandle}\n\nSource: https://twitter.com/${person.twitterHandle}\nFetched: ${new Date().toISOString()}\n\n${data.rawOutput}`);
-    } else if (!twitter.isAvailable()) {
-      console.log(c.yellow('  (bird CLI not found, skipping Twitter)'));
+    } else {
+      if (!twitter.isAvailable()) {
+        console.log(c.yellow('  (bird CLI not found, trying web scrape...)'));
+      } else {
+        console.log(c.dim('  bird returned no data, trying web scrape...'));
+      }
+      // Fallback: scrape public profile page via nitter / syndication
+      const pageData = twitter.fetchProfilePage(person.twitterHandle);
+      if (pageData) {
+        const parts = [];
+        if (pageData.displayName) parts.push(`Name: ${pageData.displayName}`);
+        if (pageData.bio) parts.push(`Bio: ${pageData.bio}`);
+        if (pageData.location) parts.push(`Location: ${pageData.location}`);
+        if (pageData.website) parts.push(`Website: ${pageData.website}`);
+        if (pageData.tweets.length) parts.push(`\nRecent tweets:\n${pageData.tweets.slice(0, 10).map(t => `- ${t}`).join('\n')}`);
+        if (parts.length) {
+          const raw = parts.join('\n');
+          rawParts.push(`=== Twitter Profile (@${person.twitterHandle}) ===\n${raw}`);
+          sources.push(`https://twitter.com/${person.twitterHandle}`);
+          saveRawSource(personSlug, `twitter_profile_${person.twitterHandle}`, `# Twitter Profile @${person.twitterHandle}\n\nSource: https://nitter.net/${person.twitterHandle}\nFetched: ${new Date().toISOString()}\n\n${raw}`);
+          console.log(c.green('  Got profile data from web scrape'));
+        }
+      }
     }
   }
 
@@ -116,6 +137,156 @@ try {
   if (count > 0) console.error(c.yellow(`[${count} new change(s) - run 'vip digest' to view]`));
 } catch {}
 
+function generateManualTemplate(name) {
+  const today = new Date().toISOString().slice(0, 10);
+  return `# ${name} — Profile
+
+> Current: {role @ company}
+> Previous: {previous role}
+> Updated: ${today}
+
+---
+
+## Background
+- {career highlight 1}
+- {career highlight 2}
+- {career highlight 3}
+
+---
+
+## Core Philosophy
+**"{quote}"**
+{interpretation}
+
+**"{quote}"**
+{interpretation}
+
+---
+
+## Leadership & Work Style
+- **Type:** {IC Leader/Delegator/Visionary/Operator — with evidence}
+- **Speed:** {How fast they move, what pace they expect}
+- **Decision-making:** {Data-driven/Intuition/Consensus — with evidence}
+- **Communication:** {Direct/Diplomatic/Storyteller — how they interact publicly}
+
+---
+
+## Current Focus
+- {Focus area 1 with evidence}
+- {Focus area 2 with evidence}
+
+---
+
+## What They Want
+- {Goal/desire 1}
+- {Goal/desire 2}
+
+---
+
+## Relationships & Alliances
+
+**Allies / People they like:**
+- {Person 1} — {why}
+- {Person 2} — {why}
+
+**Rivals / People they clash with:**
+- {Person 1} — {why}
+- {Person 2} — {why}
+
+**Key relationships:**
+- {Notable relationship with context}
+
+---
+
+## Recent Activity
+
+### {Date} — {Event type}
+- {What happened, with context}
+
+---
+
+## Interaction History
+No interactions recorded yet.
+
+---
+
+## How to Work With Them
+
+**Talking Points:**
+- {Topic 1 — why it would resonate}
+- {Topic 2 — why it would resonate}
+- {Topic 3 — why it would resonate}
+
+**Do:**
+- {Approach 1}
+- {Approach 2}
+- {Approach 3}
+
+**Don't:**
+- {Anti-pattern 1}
+- {Anti-pattern 2}
+- {Anti-pattern 3}
+
+**Gift Ideas:** {Based on known interests}
+
+---
+
+## Key Quotes
+- "{quote}" — {context}
+- "{quote}" — {context}
+
+---
+
+## Personality (Inferred)
+- **MBTI:** {type} — {rationale}
+- **DISC:** {type}
+- **Risk tolerance:** {Conservative/Calculated/Aggressive}
+- **Influence style:** {Authority/Reciprocity/Vision/Data}
+
+---
+
+## Links
+- Twitter: {url}
+- LinkedIn: {url}
+- Website/Blog: {url}
+
+---
+`;
+}
+
+async function offerManualTemplate(name) {
+  const filepath = saveProfile(name, generateManualTemplate(name));
+  console.log(c.green(`  Created blank profile template.`));
+  console.log(`  Edit: ${filepath}`);
+
+  appendChangelog({
+    timestamp: new Date().toISOString(),
+    name,
+    slug: slugify(name),
+    type: 'created',
+    summary: `Manual template created for ${name}`,
+  });
+
+  const editor = process.env.EDITOR || process.env.VISUAL;
+  if (editor) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      const answer = await rl.question('  Open in editor? (Y/n) > ');
+      if (!answer || answer.trim().toLowerCase() !== 'n') {
+        try {
+          execFileSync(editor, [filepath], { stdio: 'inherit' });
+        } catch {
+          console.log(c.yellow(`  Could not open editor '${editor}'.`));
+        }
+      }
+    } finally {
+      rl.close();
+    }
+  }
+
+  return filepath;
+}
+
 const program = new Command();
 const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
 program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version(pkg.version, '-v, --version');
@@ -129,8 +300,25 @@ program.command('add')
   .option('--no-ai', 'Skip AI synthesis')
   .option('-f, --force', 'Overwrite existing')
   .option('-y, --youtube <urls...>', 'YouTube video URLs to transcribe')
+  .option('--manual', 'Create blank template to fill manually')
   .action(async (queryParts, opts) => {
     const query = queryParts.join(' ');
+
+    // --manual: skip all data fetching, create blank template
+    if (opts.manual) {
+      const name = query;
+      if (!name.trim()) { console.error(c.red('Please provide a name.')); process.exit(1); }
+
+      if (!opts.force && profileExists(name)) {
+        console.log(`Profile for '${name}' already exists. Use -f to overwrite.`);
+        return;
+      }
+
+      console.log(c.cyan(`Creating manual template for ${name}...`));
+      await offerManualTemplate(name);
+      return;
+    }
+
     console.log(c.cyan(`Resolving ${query}...`));
 
     let person;
@@ -196,13 +384,10 @@ program.command('add')
     }
 
     if (!rawData.trim()) {
-      console.error(c.red('No data found for this person.'));
-      console.error(c.dim('  This person may not have a Wikipedia page or public profile indexed by search.'));
-      console.error(c.dim('  Try one of these:'));
-      console.error(c.dim(`    vip add @twitterhandle              # Use their Twitter handle`));
-      console.error(c.dim(`    vip add https://twitter.com/handle   # Use their Twitter URL`));
-      console.error(c.dim(`    vip add "${person.name}" -c "Company" # Add company for better search`));
-      process.exit(1);
+      console.error(c.yellow('No data found for this person.'));
+      console.error(c.dim('  Creating blank profile template...'));
+      await offerManualTemplate(person.name);
+      return;
     }
 
     let profile;

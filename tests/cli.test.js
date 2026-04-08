@@ -389,6 +389,53 @@ describe('vip list --tag', () => {
   });
 });
 
+describe('vip add --manual', () => {
+  const manualSlug = 'manual-test-person';
+
+  afterEach(() => {
+    run(['rm', manualSlug, '-y']);
+  });
+
+  it('shows --manual in help text', () => {
+    const { stdout } = run(['add', '--help']);
+    assert.ok(stdout.includes('--manual'), 'help should list --manual option');
+  });
+
+  it('creates a blank template with --manual', () => {
+    const { stdout, exitCode } = run(['add', 'Manual Test Person', '--manual'], {
+      env: { ...process.env, NODE_NO_WARNINGS: '1', EDITOR: '' },
+    });
+    assert.strictEqual(exitCode, 0, `should exit 0, got stderr: ${stdout}`);
+    assert.ok(stdout.includes('template') || stdout.includes('Template'), 'should mention template');
+
+    // Verify the profile was created
+    const { stdout: showOut, exitCode: showCode } = run(['show', manualSlug]);
+    assert.strictEqual(showCode, 0, 'profile should exist');
+    assert.ok(showOut.includes('Manual Test Person'), 'profile should contain the name');
+    assert.ok(showOut.includes('Background'), 'profile should have Background section');
+    assert.ok(showOut.includes('Core Philosophy'), 'profile should have Core Philosophy section');
+    assert.ok(showOut.includes('How to Work With Them'), 'profile should have How to Work section');
+  });
+
+  it('respects --force with --manual', () => {
+    // Create first
+    run(['add', 'Manual Test Person', '--manual'], {
+      env: { ...process.env, NODE_NO_WARNINGS: '1', EDITOR: '' },
+    });
+    // Without --force, should say already exists
+    const { stdout: noForce } = run(['add', 'Manual Test Person', '--manual'], {
+      env: { ...process.env, NODE_NO_WARNINGS: '1', EDITOR: '' },
+    });
+    assert.ok(noForce.includes('already exists'), 'should warn about existing profile');
+
+    // With --force, should succeed
+    const { exitCode } = run(['add', 'Manual Test Person', '--manual', '-f'], {
+      env: { ...process.env, NODE_NO_WARNINGS: '1', EDITOR: '' },
+    });
+    assert.strictEqual(exitCode, 0, 'should succeed with --force');
+  });
+});
+
 // Helper to create a temp import file
 function createTempImport(entries) {
   const tmpFile = path.join(os.tmpdir(), `vip-test-import-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
