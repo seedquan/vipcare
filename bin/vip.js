@@ -6,7 +6,7 @@ import os from 'os';
 import readline from 'readline/promises';
 import { execFileSync } from 'child_process';
 import { checkTool, getProfilesDir, loadConfig, saveConfig } from '../lib/config.js';
-import { deleteProfile, getProfilePath, listProfiles, loadProfile, profileExists, saveProfile, searchProfiles, slugify } from '../lib/profile.js';
+import { deleteProfile, getProfilePath, listProfiles, loadProfile, parseTags, profileExists, saveProfile, searchProfiles, slugify } from '../lib/profile.js';
 import { isUrl, resolveFromName, resolveFromUrl } from '../lib/resolver.js';
 import * as twitter from '../lib/fetchers/twitter.js';
 import { searchPerson } from '../lib/fetchers/search.js';
@@ -76,7 +76,7 @@ try {
 } catch {}
 
 const program = new Command();
-program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.3.0');
+program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.3.1');
 
 // --- add ---
 program.command('add')
@@ -191,9 +191,7 @@ program.command('list')
       profiles = profiles.filter(p => {
         const content = loadProfile(p.slug);
         if (!content) return false;
-        const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
-        if (!tagsMatch) return false;
-        const tags = tagsMatch[1].split('\n').filter(l => l.match(/^- /)).map(l => l.replace(/^- /, '').trim());
+        const tags = parseTags(content);
         return tags.includes(opts.tag);
       });
     }
@@ -489,8 +487,13 @@ program.command('card')
 // --- digest ---
 program.command('digest')
   .description('Show recent changes')
-  .action(() => {
+  .option('--json', 'Output as JSON')
+  .action((opts) => {
     const entries = readChangelog(30);
+    if (opts.json) {
+      console.log(JSON.stringify(entries, null, 2));
+      return;
+    }
     if (!entries.length) { console.log(c.dim('No recent changes.')); return; }
 
     console.log(c.bold(c.cyan('Changes in the last 30 days:\n')));
@@ -553,15 +556,7 @@ program.command('compare')
       const mbtiMatch = content.match(/\*\*MBTI:\*\*\s*(.+)/);
       const industryMatch = content.match(/\*\*Industry:\*\*\s*(.+)/);
 
-      // Parse tags from ## Tags section
-      const tags = [];
-      const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
-      if (tagsMatch) {
-        for (const line of tagsMatch[1].split('\n')) {
-          const m = line.match(/^- (.+)/);
-          if (m) tags.push(m[1].trim());
-        }
-      }
+      const tags = parseTags(content);
       if (industryMatch && !tags.length) tags.push(industryMatch[1].trim());
 
       return {
@@ -642,7 +637,7 @@ program.command('tag')
     const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
 
     if (tagsMatch) {
-      const existingTags = tagsMatch[1].split('\n').filter(l => l.match(/^- /)).map(l => l.replace(/^- /, '').trim());
+      const existingTags = parseTags(content);
       if (existingTags.includes(tag)) {
         console.log(c.yellow(`Tag '${tag}' already exists on ${name}.`));
         return;
@@ -698,18 +693,6 @@ program.command('tags')
   .argument('[name]', 'Profile name (optional)')
   .option('--json', 'Output as JSON')
   .action((name, opts) => {
-    function parseTags(content) {
-      const tags = [];
-      const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
-      if (tagsMatch) {
-        for (const line of tagsMatch[1].split('\n')) {
-          const m = line.match(/^- (.+)/);
-          if (m) tags.push(m[1].trim());
-        }
-      }
-      return tags;
-    }
-
     if (name) {
       const content = loadProfile(name);
       if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
@@ -752,8 +735,16 @@ program.command('tags')
 // --- config ---
 program.command('config')
   .description('View/edit settings')
-  .action(() => {
+  .option('--json', 'Output as JSON')
+  .action((opts) => {
     const cfg = loadConfig();
+    if (opts.json) {
+      console.log(JSON.stringify({
+        ...cfg,
+        tools: { bird: checkTool('bird'), ai_backend: getBackendName() }
+      }, null, 2));
+      return;
+    }
     console.log(c.bold(c.cyan('Current config:')));
     console.log(`  Profiles dir: ${cfg.profiles_dir}`);
     console.log(`  Monitor interval: ${cfg.monitor_interval_hours}h`);

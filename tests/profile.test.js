@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { slugify, validateName, saveProfile, loadProfile, listProfiles, searchProfiles, profileExists, deleteProfile } from '../lib/profile.js';
+import { slugify, validateName, saveProfile, loadProfile, listProfiles, searchProfiles, profileExists, deleteProfile, parseTags } from '../lib/profile.js';
 
 let tmpDir;
 
@@ -108,5 +108,22 @@ describe('profileExists / deleteProfile', () => {
 
   it('delete missing returns false', () => {
     assert.ok(!deleteProfile('Nobody', tmpDir));
+  });
+});
+
+describe('parseTags', () => {
+  it('parses tags from content', () => {
+    const content = '# Test\n\n## Tags\n- investor\n- AI\n- founder\n\n---\n';
+    const tags = parseTags(content);
+    assert.deepStrictEqual(tags, ['investor', 'AI', 'founder']);
+  });
+
+  it('returns empty array for empty content', () => {
+    assert.deepStrictEqual(parseTags(''), []);
+  });
+
+  it('returns empty array when no tags section exists', () => {
+    const content = '# Test\n\n## Notes\n- some note\n';
+    assert.deepStrictEqual(parseTags(content), []);
   });
 });
