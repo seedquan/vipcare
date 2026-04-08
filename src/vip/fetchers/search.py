@@ -15,9 +15,12 @@ class SearchResult:
 def search(query: str, max_results: int = 5) -> list[SearchResult]:
     """Search DuckDuckGo and return results."""
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
     except ImportError:
-        return []
+        try:
+            from duckduckgo_search import DDGS
+        except ImportError:
+            return []
 
     results = []
     try:

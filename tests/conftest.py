@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-from dataclasses import dataclass
 from unittest.mock import MagicMock
 
 import pytest
@@ -72,26 +71,8 @@ def mock_ddg(monkeypatch):
             ]
 
     monkeypatch.setattr("vip.fetchers.search.DDGS", MockDDGS, raising=False)
-    # Also patch the import inside the function
     import vip.fetchers.search as search_mod
     monkeypatch.setattr(search_mod, "DDGS", MockDDGS, raising=False)
-
-
-@pytest.fixture
-def mock_claude_cli(monkeypatch):
-    """Mock Claude CLI subprocess calls."""
-    original_run = subprocess.run
-
-    def mock_run(cmd, **kwargs):
-        if isinstance(cmd, list) and len(cmd) > 0 and cmd[0] == "claude":
-            result = MagicMock()
-            result.returncode = 0
-            result.stdout = "# Test Person\n\n> Test summary\n\n## Basic Info\n- **Title:** CEO\n- **Company:** TestCo\n"
-            result.stderr = ""
-            return result
-        return original_run(cmd, **kwargs)
-
-    monkeypatch.setattr(subprocess, "run", mock_run)
 
 
 @pytest.fixture

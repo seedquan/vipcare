@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
 
@@ -23,12 +24,39 @@ def is_available() -> bool:
     return check_tool("bird")
 
 
-def fetch_profile(handle: str) -> TwitterData | None:
-    """Fetch a Twitter profile and recent tweets using bird CLI.
+def _parse_tweets(output: str) -> list[str]:
+    """Parse bird CLI output into individual tweets, filtering decorators."""
+    tweets = []
+    current = []
 
-    Args:
-        handle: Twitter handle without @ prefix
-    """
+    for line in output.split("\n"):
+        stripped = line.strip()
+        # Skip separator lines and empty lines between tweets
+        if re.match(r"^[─━═]+$", stripped) or not stripped:
+            if current:
+                tweet_text = " ".join(current).strip()
+                if tweet_text and len(tweet_text) > 5:
+                    tweets.append(tweet_text)
+                current = []
+            continue
+        # Skip metadata lines (timestamps, retweet counts, etc.)
+        if re.match(r"^\d+ (retweets?|likes?|replies|views)", stripped, re.IGNORECASE):
+            continue
+        if re.match(r"^\d{4}-\d{2}-\d{2}", stripped):
+            continue
+        current.append(stripped)
+
+    # Don't forget last tweet
+    if current:
+        tweet_text = " ".join(current).strip()
+        if tweet_text and len(tweet_text) > 5:
+            tweets.append(tweet_text)
+
+    return tweets
+
+
+def fetch_profile(handle: str) -> TwitterData | None:
+    """Fetch a Twitter profile and recent tweets using bird CLI."""
     if not is_available():
         return None
 
@@ -43,11 +71,7 @@ def fetch_profile(handle: str) -> TwitterData | None:
         )
         if result.returncode == 0 and result.stdout.strip():
             data.raw_output = result.stdout
-            # Parse tweets from output
-            for line in result.stdout.strip().split("\n"):
-                line = line.strip()
-                if line and not line.startswith("─"):
-                    data.tweets.append(line)
+            data.tweets = _parse_tweets(result.stdout)
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 

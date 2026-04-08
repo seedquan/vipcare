@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from vip.resolver import (
+    _extract_real_name_from_snippets,
+    _linkedin_matches_person,
     is_url,
     parse_linkedin_url,
     parse_twitter_handle,
@@ -70,3 +72,33 @@ def test_resolve_no_results():
     person = resolve_from_url("https://example.com/unknown")
     assert person.name == ""
     assert len(person.other_urls) == 1
+
+
+def test_extract_real_name_from_snippets():
+    snippets = ["Sam Altman (@sama) / X\nCEO @OpenAI"]
+    name = _extract_real_name_from_snippets(snippets, "sama")
+    assert name == "Sam Altman"
+
+
+def test_extract_real_name_no_match():
+    snippets = ["Some random text about technology"]
+    name = _extract_real_name_from_snippets(snippets, "testuser")
+    assert name is None
+
+
+def test_linkedin_matches_person():
+    assert _linkedin_matches_person(
+        "https://linkedin.com/in/samaltman",
+        "Sam Altman - CEO",
+        "CEO at OpenAI",
+        "Sam Altman",
+    )
+
+
+def test_linkedin_rejects_wrong_person():
+    assert not _linkedin_matches_person(
+        "https://linkedin.com/in/andrew-sama",
+        "Andrew Sama - MD",
+        "Doctor at Hospital",
+        "Sam Altman",
+    )

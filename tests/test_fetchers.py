@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from unittest.mock import MagicMock
 
-from vip.fetchers.twitter import TwitterData, fetch_profile, is_available
+from vip.fetchers.twitter import TwitterData, _parse_tweets, fetch_profile, is_available
 from vip.fetchers.web import _TextExtractor
 
 
@@ -44,6 +44,18 @@ def test_web_text_extractor():
     assert "Hello" in text
     assert "World" in text
     assert "var x=1" not in text
+
+
+def test_parse_tweets_filters_separators():
+    output = "Hello world tweet\n─────────\n2024-01-01\n5 likes\nAnother tweet here\n"
+    tweets = _parse_tweets(output)
+    assert "Hello world tweet" in tweets
+    assert "Another tweet here" in tweets
+    assert len(tweets) == 2
+
+
+def test_parse_tweets_empty():
+    assert _parse_tweets("") == []
 
 
 def test_web_text_extractor_empty():

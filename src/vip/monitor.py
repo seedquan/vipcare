@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -10,13 +11,11 @@ from vip.config import get_profiles_dir, CHANGELOG_FILE
 from vip.fetchers import search as search_fetcher
 from vip.fetchers import twitter as twitter_fetcher
 from vip.profile import list_profiles, load_profile, save_profile
-from vip.resolver import parse_twitter_handle, parse_linkedin_url
 from vip.synthesizer import synthesize_profile, detect_changes
 
 
 def _extract_metadata(content: str) -> dict:
     """Extract metadata (links, name) from existing profile Markdown."""
-    import re
     metadata = {"twitter_handle": None, "linkedin_url": None, "name": None}
 
     name_match = re.search(r"^# (.+)$", content, re.MULTILINE)
@@ -43,7 +42,6 @@ def _gather_fresh_data(metadata: dict) -> tuple[str, list[str]]:
 
     name = metadata.get("name", "")
 
-    # Twitter data via bird CLI
     handle = metadata.get("twitter_handle")
     if handle:
         twitter_data = twitter_fetcher.fetch_profile(handle)
@@ -51,7 +49,6 @@ def _gather_fresh_data(metadata: dict) -> tuple[str, list[str]]:
             raw_parts.append(f"=== Twitter (@{handle}) ===\n{twitter_data.raw_output}")
             sources.append(f"https://twitter.com/{handle}")
 
-    # Web search
     if name:
         results = search_fetcher.search_person(name)
         for r in results:
@@ -98,10 +95,7 @@ def unread_count() -> int:
 
 
 def run_monitor(profiles_dir: Path | None = None, verbose: bool = False) -> list[dict]:
-    """Run a full monitoring cycle: check all profiles for updates.
-
-    Returns list of change entries.
-    """
+    """Run a full monitoring cycle: check all profiles for updates."""
     if profiles_dir is None:
         profiles_dir = get_profiles_dir()
 
@@ -127,11 +121,9 @@ def run_monitor(profiles_dir: Path | None = None, verbose: bool = False) -> list
                 print(f"    No new data found, skipping.")
             continue
 
-        # Detect changes
         change_summary = detect_changes(old_content, new_data)
 
         if change_summary:
-            # Re-synthesize profile
             new_profile = synthesize_profile(new_data, sources)
             save_profile(name, new_profile, profiles_dir)
 

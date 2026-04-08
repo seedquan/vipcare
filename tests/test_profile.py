@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from vip.profile import (
+    delete_profile,
     list_profiles,
     load_profile,
     profile_exists,
@@ -83,3 +84,14 @@ def test_load_fuzzy_match(profiles_dir):
     result = load_profile("sam", profiles_dir)
     assert result is not None
     assert "Sam Altman" in result
+
+
+def test_delete_profile(profiles_dir):
+    save_profile("Test", "content", profiles_dir)
+    assert profile_exists("Test", profiles_dir)
+    assert delete_profile("Test", profiles_dir)
+    assert not profile_exists("Test", profiles_dir)
+
+
+def test_delete_not_found(profiles_dir):
+    assert not delete_profile("Nobody", profiles_dir)

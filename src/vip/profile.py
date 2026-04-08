@@ -138,3 +138,15 @@ def get_profile_path(name: str, profiles_dir: Path | None = None) -> Path:
         profiles_dir = get_profiles_dir()
     slug = slugify(name)
     return profiles_dir / f"{slug}.md"
+
+
+def delete_profile(name: str, profiles_dir: Path | None = None) -> bool:
+    """Delete a profile file. Returns True if deleted."""
+    if profiles_dir is None:
+        profiles_dir = get_profiles_dir()
+    slug = slugify(name)
+    filepath = profiles_dir / f"{slug}.md"
+    if filepath.exists():
+        filepath.unlink()
+        return True
+    return False

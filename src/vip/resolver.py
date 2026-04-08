@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from urllib.parse import urlparse
 
 from vip.fetchers.search import SearchResult, search_person
 
@@ -42,6 +41,39 @@ def parse_linkedin_url(url: str) -> str | None:
     return None
 
 
+def _linkedin_matches_person(linkedin_url: str, snippet_title: str, snippet_body: str, person_name: str) -> bool:
+    """Check if a LinkedIn result actually matches the person we're looking for."""
+    name_parts = person_name.lower().split()
+    if len(name_parts) < 2:
+        return True  # Can't validate with a single name
+
+    text = (snippet_title + " " + snippet_body).lower()
+
+    # Check if at least first AND last name appear in the snippet
+    first = name_parts[0]
+    last = name_parts[-1]
+    return first in text and last in text
+
+
+def _extract_real_name_from_snippets(snippets: list[str], handle: str) -> str | None:
+    """Try to extract a person's real name from search snippets about their handle."""
+    for snippet in snippets:
+        # Common patterns: "Sam Altman (@sama)", "Sam Altman - sama"
+        # Look for "Firstname Lastname" near the handle
+        pattern = rf"([A-Z][a-z]+ [A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\s*(?:\(|[-–—/|,])\s*@?{re.escape(handle)}"
+        match = re.search(pattern, snippet)
+        if match:
+            return match.group(1)
+
+        # Also try: "@handle - Firstname Lastname" or "handle | Firstname Lastname"
+        pattern2 = rf"@?{re.escape(handle)}\s*(?:\)|[-–—/|,])\s*([A-Z][a-z]+ [A-Z][a-z]+)"
+        match2 = re.search(pattern2, snippet)
+        if match2:
+            return match2.group(1)
+
+    return None
+
+
 def resolve_from_url(url: str) -> ResolvedPerson:
     """Resolve a person from a direct social media URL."""
     person = ResolvedPerson(name="")
@@ -49,7 +81,19 @@ def resolve_from_url(url: str) -> ResolvedPerson:
     twitter_handle = parse_twitter_handle(url)
     if twitter_handle:
         person.twitter_handle = twitter_handle
-        person.name = twitter_handle
+
+        # Search for the real name behind this handle
+        from vip.fetchers.search import search
+        results = search(f"@{twitter_handle} twitter", max_results=5)
+        snippets = [f"{r.title}\n{r.body}" for r in results]
+
+        real_name = _extract_real_name_from_snippets(snippets, twitter_handle)
+        if real_name:
+            person.name = real_name
+        else:
+            person.name = twitter_handle
+
+        person.raw_snippets = snippets
         return person
 
     linkedin_url = parse_linkedin_url(url)
@@ -79,17 +123,20 @@ def resolve_from_name(name: str, company: str | None = None) -> ResolvedPerson:
             if handle:
                 person.twitter_handle = handle
 
-        # Find LinkedIn URL
+        # Find LinkedIn URL — validate it actually matches the person
         if person.linkedin_url is None:
             linkedin = parse_linkedin_url(r.url)
-            if linkedin:
+            if linkedin and _linkedin_matches_person(linkedin, r.title, r.body, name):
                 person.linkedin_url = linkedin
 
         # Collect all URLs
-        person.other_urls.append(r.url)
+        if r.url not in person.other_urls:
+            person.other_urls.append(r.url)
 
         # Collect snippets for synthesis
-        person.raw_snippets.append(f"{r.title}\n{r.body}")
+        snippet = f"{r.title}\n{r.body}"
+        if snippet not in person.raw_snippets:
+            person.raw_snippets.append(snippet)
 
     return person
 

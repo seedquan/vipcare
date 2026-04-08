@@ -1,5 +1,32 @@
 """Profile templates and system prompts for Claude CLI synthesis."""
 
+from __future__ import annotations
+
+PROFILE_TEMPLATE = """\
+# {name}
+
+> (summary to be filled)
+
+## Basic Info
+- **Title:** {title}
+- **Company:** {company}
+- **Location:** {location}
+- **Industry:** {industry}
+
+## Links
+- Twitter: {twitter}
+- LinkedIn: {linkedin}
+- Website: {website}
+
+## Raw Data
+
+{raw_data}
+
+---
+*Last updated: {date}*
+*Sources: {sources}*
+"""
+
 PROFILE_SYSTEM_PROMPT = """\
 You are a research assistant building a VIP contact profile.
 Given the raw data below from public sources (tweets, LinkedIn snippets, web search results), \

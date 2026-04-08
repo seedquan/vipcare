@@ -15,6 +15,8 @@ def test_cli_help():
     assert "list" in result.output
     assert "show" in result.output
     assert "monitor" in result.output
+    assert "rm" in result.output
+    assert "edit" in result.output
 
 
 def test_cli_version():
@@ -79,6 +81,55 @@ def test_search_no_match(monkeypatch, sample_profiles):
     result = runner.invoke(main, ["search", "nonexistent"])
     assert result.exit_code == 0
     assert "No matches" in result.output
+
+
+def test_rm_profile(monkeypatch, sample_profiles):
+    monkeypatch.setattr("vip.profile.get_profiles_dir", lambda: sample_profiles)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["rm", "sam-altman", "-y"])
+    assert result.exit_code == 0
+    assert "deleted" in result.output.lower()
+    assert not (sample_profiles / "sam-altman.md").exists()
+
+
+def test_rm_not_found(monkeypatch, profiles_dir):
+    monkeypatch.setattr("vip.profile.get_profiles_dir", lambda: profiles_dir)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["rm", "nobody", "-y"])
+    assert result.exit_code != 0
+
+
+def test_edit_title(monkeypatch, sample_profiles):
+    monkeypatch.setattr("vip.profile.get_profiles_dir", lambda: sample_profiles)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["edit", "sam-altman", "--title", "CTO"])
+    assert result.exit_code == 0
+
+    content = (sample_profiles / "sam-altman.md").read_text()
+    assert "CTO" in content
+
+
+def test_edit_note(monkeypatch, sample_profiles):
+    monkeypatch.setattr("vip.profile.get_profiles_dir", lambda: sample_profiles)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["edit", "sam-altman", "--note", "Met at conference"])
+    assert result.exit_code == 0
+
+    content = (sample_profiles / "sam-altman.md").read_text()
+    assert "Met at conference" in content
+
+
+def test_edit_no_changes(monkeypatch, sample_profiles):
+    monkeypatch.setattr("vip.profile.get_profiles_dir", lambda: sample_profiles)
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["edit", "sam-altman"])
+    assert result.exit_code == 0
+    assert "No changes" in result.output
 
 
 def test_digest_empty(monkeypatch):
