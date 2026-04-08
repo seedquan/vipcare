@@ -522,7 +522,47 @@ program.command('card')
     const dir = path.dirname(outputPath);
     const file = path.basename(outputPath);
 
-    const server = http.createServer((req, res) => {
+    const server = http.createServer(async (req, res) => {
+      // API: regenerate a profile
+      if (req.url.startsWith('/api/regenerate/')) {
+        const slug = req.url.replace('/api/regenerate/', '').replace(/\//g, '');
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        console.log(c.cyan(`  Regenerating ${slug}...`));
+        try {
+          const content = loadProfile(slug);
+          if (!content) { res.writeHead(404); res.end(JSON.stringify({ error: 'Profile not found' })); return; }
+
+          const { extractMetadata } = await import('../lib/monitor.js');
+          const meta = extractMetadata(content);
+          const personName = meta.name || slug;
+
+          const person = resolveFromName(personName);
+          if (meta.twitterHandle) person.twitterHandle = person.twitterHandle || meta.twitterHandle;
+          if (meta.linkedinUrl) person.linkedinUrl = person.linkedinUrl || meta.linkedinUrl;
+
+          const [rawData, sources] = gatherData(person);
+          if (!rawData.trim()) { res.writeHead(400); res.end(JSON.stringify({ error: 'No data found' })); return; }
+
+          const profile = await synthesizeProfile(rawData, sources);
+          saveProfile(personName, profile);
+
+          // Regenerate cards
+          regenerate();
+
+          console.log(c.green(`  ${personName} regenerated.`));
+          res.writeHead(200);
+          res.end(JSON.stringify({ ok: true, name: personName }));
+        } catch (e) {
+          console.error(c.red(`  Error: ${e.message}`));
+          res.writeHead(500);
+          res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+      }
+
+      // Static files
       const filePath = req.url === '/' ? path.join(dir, file) : path.join(dir, req.url);
       if (!fs.existsSync(filePath)) { res.writeHead(404); res.end('Not found'); return; }
       const ext = path.extname(filePath);
