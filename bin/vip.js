@@ -73,7 +73,7 @@ function gatherData(person) {
 // Show unread count
 try {
   const count = unreadCount();
-  if (count > 0) console.log(c.yellow(`[${count} new change(s) - run 'vip digest' to view]`));
+  if (count > 0) console.error(c.yellow(`[${count} new change(s) - run 'vip digest' to view]`));
 } catch {}
 
 const program = new Command();
