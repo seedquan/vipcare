@@ -46,8 +46,9 @@ vip update sam-altman
 
 | Command | Description |
 |---------|-------------|
+| `vip init` | Interactive setup |
 | `vip add <name-or-url>` | Add a new profile (`-c` company, `-f` force, `--no-ai`, `--dry-run`, `-y` YouTube URLs) |
-| `vip list` | List all profiles |
+| `vip list` | List all profiles (`--tag` filter by tag) |
 | `vip show <name>` | Display a profile |
 | `vip search <keyword>` | Search across all profiles |
 | `vip edit <name>` | Edit profile fields (`--title`, `--company`, `--twitter`, `--linkedin`, `--note`) |
@@ -56,6 +57,12 @@ vip update sam-altman
 | `vip open <name>` | Open a profile in your editor |
 | `vip youtube <name> <url>` | Add YouTube video transcript to a profile |
 | `vip youtube-search <name>` | Search YouTube for a person's talks (`-n` max results) |
+| `vip compare <n1> <n2>` | Side-by-side comparison (`--json`) |
+| `vip tag <name> <tag>` | Add tag to profile |
+| `vip untag <name> <tag>` | Remove tag from profile |
+| `vip tags [name]` | List tags (`--json`) |
+| `vip stats` | Show dashboard overview (`--json`) |
+| `vip regenerate` | Re-synthesize all profiles (`--dry-run`, `--no-ai`) |
 | `vip card` | Generate H5 baseball card page (`-o` output path) |
 | `vip export` | Export all profiles for backup |
 | `vip import` | Restore profiles from backup |

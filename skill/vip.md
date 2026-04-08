@@ -21,6 +21,7 @@ vip add <url>                         # Add from Twitter/LinkedIn URL
 
 vip list                              # List all profiles
   --json                              # Output as JSON array
+  --tag <tag>                         # Filter by tag
 
 vip show <name>                       # Display a profile
   --json                              # Output as JSON with parsed vipData
@@ -46,6 +47,7 @@ vip open <name>                       # Open profile in $EDITOR
 
 ```
 vip youtube <name> <url>              # Transcribe video, re-synthesize profile
+  --no-ai                             # Skip AI synthesis
 vip youtube-search <name>             # Find YouTube videos for a person
   -n, --count <n>                     # Max results (default: 5)
 ```
@@ -77,17 +79,39 @@ vip monitor run                       # Run monitor check now
   -v, --verbose                       # Verbose output
 ```
 
+### Setup
+
+```
+vip init                              # Interactive first-time setup
+```
+
+### Compare and tags
+
+```
+vip compare <name1> <name2>           # Side-by-side profile comparison
+  --json                              # Output as JSON
+
+vip tag <name> <tag>                  # Add a tag to a profile
+vip untag <name> <tag>                # Remove a tag from a profile
+vip tags [name]                       # List tags (all profiles, or one profile)
+  --json                              # Output as JSON
+```
+
+### Stats and regeneration
+
+```
+vip stats                             # Show dashboard overview
+  --json                              # Output as JSON
+
+vip regenerate                        # Re-synthesize all profiles
+  --dry-run                           # Show what would be regenerated
+  --no-ai                             # Skip AI synthesis (raw data only)
+```
+
 ### Configuration
 
 ```
 vip config                            # Show current settings and tool status
-```
-
-### Planned commands (being added)
-
-```
-vip stats                             # Show dashboard overview
-vip regenerate                        # Re-synthesize all profiles
 ```
 
 ## Workflow for Adding a Person

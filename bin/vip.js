@@ -156,6 +156,10 @@ program.command('add')
       const stop = spinner('Synthesizing profile with AI...');
       try {
         profile = await synthesizeProfile(rawData, sources);
+      } catch (e) {
+        console.error(c.red(`AI synthesis failed: ${e.message}`));
+        console.error(c.dim('Use --no-ai to save raw data without synthesis.'));
+        process.exit(1);
       } finally { stop(); }
     }
 
@@ -306,7 +310,13 @@ program.command('update')
       profile = `# ${personName}\n\n## Raw Data\n\n${rawData}`;
     } else {
       const stop2 = spinner('Re-synthesizing profile...');
-      try { profile = await synthesizeProfile(rawData, sources); } finally { stop2(); }
+      try {
+        profile = await synthesizeProfile(rawData, sources);
+      } catch (e) {
+        console.error(c.red(`AI synthesis failed: ${e.message}`));
+        console.error(c.dim('Use --no-ai to save raw data without synthesis.'));
+        process.exit(1);
+      } finally { stop2(); }
     }
 
     const filepath = saveProfile(personName, profile);
@@ -388,13 +398,7 @@ program.command('edit')
       modified = true;
     }
     if (opts.note) {
-      if (content.includes('## Notes')) {
-        content = content.replace('## Notes\n', `## Notes\n- ${opts.note}\n`);
-      } else if (content.includes('\n---\n')) {
-        content = content.replace('\n---\n', `\n## Notes\n- ${opts.note}\n\n---\n`);
-      } else {
-        content = content.trimEnd() + `\n\n## Notes\n- ${opts.note}\n`;
-      }
+      content = appendNote(content, opts.note);
       modified = true;
     }
 
@@ -407,7 +411,8 @@ program.command('youtube')
   .description('Add YouTube video transcript to existing profile')
   .argument('<name>', 'Profile name')
   .argument('<url>', 'YouTube video URL')
-  .action(async (name, url) => {
+  .option('--no-ai', 'Skip AI synthesis')
+  .action(async (name, url, opts) => {
     const content = loadProfile(name);
     if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
 
@@ -428,9 +433,19 @@ program.command('youtube')
     const rawData = content + `\n\n=== YouTube Video: ${yt.title} (${yt.url}) ===\n${yt.transcript}`;
     const sources = [yt.url];
 
-    const stop2 = spinner('Re-synthesizing profile...');
     let profile;
-    try { profile = await synthesizeProfile(rawData, sources); } finally { stop2(); }
+    if (opts.ai === false) {
+      profile = `# ${meta.name || name}\n\n## Raw Data\n\n${rawData}`;
+    } else {
+      const stop2 = spinner('Re-synthesizing profile...');
+      try {
+        profile = await synthesizeProfile(rawData, sources);
+      } catch (e) {
+        console.error(c.red(`AI synthesis failed: ${e.message}`));
+        console.error(c.dim('Use --no-ai to save raw data without synthesis.'));
+        process.exit(1);
+      } finally { stop2(); }
+    }
 
     const filepath = saveProfile(meta.name || name, profile);
     console.log(c.green(`Profile updated: ${filepath}`));
@@ -767,7 +782,7 @@ program.command('init')
       const backendAnswer = await rl.question('  > ');
       const backendChoice = backendAnswer.trim() || '1';
 
-      const backendMap = { '1': 'auto', '2': 'claude-cli', '3': 'anthropic-api', '4': 'github-copilot' };
+      const backendMap = { '1': 'auto', '2': 'claude-cli', '3': 'anthropic', '4': 'copilot-cli' };
       const aiBackend = backendMap[backendChoice] || 'auto';
 
       const config = {
@@ -775,7 +790,7 @@ program.command('init')
         ai_backend: aiBackend,
       };
 
-      if (aiBackend === 'anthropic-api') {
+      if (aiBackend === 'anthropic') {
         const apiKey = await rl.question('\nAnthropic API key: ');
         if (apiKey.trim()) {
           config.anthropic_api_key = apiKey.trim();
