@@ -762,6 +762,53 @@ program.command('tags')
     }
   });
 
+// --- reset ---
+program.command('reset')
+  .description('Delete all profiles, config, and changelog data')
+  .option('-y, --yes', 'Skip confirmation')
+  .action(async (opts) => {
+    if (!opts.yes) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        const answer = await rl.question(c.red('This will delete ALL profiles, config, and changelog. Are you sure? (type "yes") > '));
+        if (answer.trim().toLowerCase() !== 'yes') {
+          console.log('Aborted.');
+          return;
+        }
+      } finally { rl.close(); }
+    }
+
+    const { CONFIG_DIR } = await import('../lib/config.js');
+    const profilesDir = getProfilesDir();
+
+    // Delete profiles
+    if (fs.existsSync(profilesDir)) {
+      const files = fs.readdirSync(profilesDir).filter(f => f.endsWith('.md'));
+      for (const f of files) fs.unlinkSync(path.join(profilesDir, f));
+      console.log(c.green(`  Deleted ${files.length} profile(s)`));
+    }
+
+    // Delete config and changelog
+    if (fs.existsSync(CONFIG_DIR)) {
+      const configFiles = fs.readdirSync(CONFIG_DIR);
+      for (const f of configFiles) {
+        const fp = path.join(CONFIG_DIR, f);
+        if (fs.statSync(fp).isFile()) fs.unlinkSync(fp);
+      }
+      console.log(c.green('  Deleted config and changelog'));
+    }
+
+    // Delete generated web files
+    const webDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'web');
+    if (fs.existsSync(webDir)) {
+      const webFiles = fs.readdirSync(webDir).filter(f => f.endsWith('.html'));
+      for (const f of webFiles) fs.unlinkSync(path.join(webDir, f));
+      if (webFiles.length) console.log(c.green(`  Deleted ${webFiles.length} card page(s)`));
+    }
+
+    console.log(c.green('\nAll data cleared. Run "vip init" to start fresh.'));
+  });
+
 // --- upgrade ---
 program.command('upgrade')
   .description('Update vipcare to the latest version')
