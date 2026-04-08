@@ -763,7 +763,7 @@ program.command('init')
     try {
       console.log(c.bold(c.cyan('\nWelcome to VIPCare!\n')));
 
-      const defaultDir = path.join(os.homedir(), 'Projects', 'vip-crm', 'profiles');
+      const defaultDir = path.join(os.homedir(), '.vip', 'profiles');
       const profilesAnswer = await rl.question(`Where should profiles be stored?\n  (default: ${defaultDir}) > `);
       const profilesDir = profilesAnswer.trim() || defaultDir;
 
