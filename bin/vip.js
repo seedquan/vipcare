@@ -7,7 +7,7 @@ import path from 'path';
 import readline from 'readline/promises';
 import { execFileSync } from 'child_process';
 import { checkTool, getProfilesDir, loadConfig, saveConfig } from '../lib/config.js';
-import { deleteProfile, getProfilePath, listProfiles, loadProfile, parseTags, profileExists, saveProfile, searchProfiles, slugify } from '../lib/profile.js';
+import { deleteProfile, getProfilePath, listProfiles, loadProfile, parseTags, profileExists, saveProfile, searchProfiles, slugify, validateName } from '../lib/profile.js';
 import { isUrl, resolveFromName, resolveFromUrl } from '../lib/resolver.js';
 import * as twitter from '../lib/fetchers/twitter.js';
 import { searchPerson } from '../lib/fetchers/search.js';
@@ -349,6 +349,11 @@ program.command('add')
     }
 
     if (!person.name) { console.error(c.red('Could not identify person.')); process.exit(1); }
+
+    if (!validateName(person.name)) {
+      console.error(c.red('Invalid profile name.'));
+      process.exit(1);
+    }
 
     console.log(c.green(`  Name: ${person.name}`));
     if (person.twitterHandle) console.log(`  Twitter: @${person.twitterHandle}`);

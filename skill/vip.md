@@ -14,10 +14,12 @@ The user's request is: $ARGUMENTS
 ```
 vip add "Name" --company "Company"    # Fetch public data, save profile
 vip add <url>                         # Add from Twitter/LinkedIn URL
+vip add @handle                       # Add from Twitter handle
   --no-ai                             # Skip AI synthesis, save raw data only
   --dry-run                           # Print result without saving
   -f, --force                         # Overwrite existing profile
   -y, --youtube <urls...>             # Include YouTube transcripts during add
+  --manual                            # Create blank template to fill manually
 
 vip list                              # List all profiles
   --json                              # Output as JSON array
@@ -65,7 +67,10 @@ vip import <file>                     # Import profiles from JSON export
 
 ```
 vip card                              # Generate H5 baseball card page
-  -o, --output <path>                 # Output file (default: web/index.html)
+  -o, --output <path>                 # Output file (default: ~/.vip/cards/index.html)
+  -p, --port <port>                   # Server port (default: 3000)
+  -w, --watch                         # Watch profile files and auto-regenerate
+  --no-serve                          # Only generate, do not start server
 ```
 
 ### Monitoring and changelog
@@ -108,6 +113,25 @@ vip regenerate                        # Re-synthesize all profiles
   --no-ai                             # Skip AI synthesis (raw data only)
 ```
 
+### Annotations
+
+```
+vip annotate <name> <note>            # Add a personal annotation to a profile
+```
+
+### Upgrade
+
+```
+vip upgrade                           # Update vipcare to the latest npm version
+```
+
+### Reset
+
+```
+vip reset                             # Delete all profiles, config, and changelog data
+  -y, --yes                           # Skip confirmation prompt
+```
+
 ### Configuration
 
 ```
@@ -124,7 +148,7 @@ vip config                            # Show current settings and tool status
    - Bio (2-3 paragraphs)
    - Key interests, achievements, recent activity
    - Background, personal info
-4. Write the polished profile back using the Edit tool to the file at `~/Projects/vip-crm/profiles/<slug>.md`
+4. Write the polished profile back using the Edit tool to the file at `~/.vip/profiles/<slug>.md`
 
 ## Workflow for Answering Questions
 

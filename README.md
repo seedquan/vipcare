@@ -47,7 +47,7 @@ vip update sam-altman
 | Command | Description |
 |---------|-------------|
 | `vip init` | Interactive setup |
-| `vip add <name-or-url>` | Add a new profile (`-c` company, `-f` force, `--no-ai`, `--dry-run`, `-y` YouTube URLs) |
+| `vip add <name-or-url>` | Add a new profile (`-c` company, `-f` force, `--no-ai`, `--dry-run`, `-y` YouTube URLs, `--manual` blank template, `@handle` shortcut) |
 | `vip list` | List all profiles (`--tag` filter by tag) |
 | `vip show <name>` | Display a profile |
 | `vip search <keyword>` | Search across all profiles |
@@ -63,11 +63,14 @@ vip update sam-altman
 | `vip tags [name]` | List tags (`--json`) |
 | `vip stats` | Show dashboard overview (`--json`) |
 | `vip regenerate` | Re-synthesize all profiles (`--dry-run`, `--no-ai`) |
-| `vip card` | Generate H5 baseball card page (`-o` output path) |
+| `vip card` | Generate H5 baseball card page (`-o` output, `-p/--port`, `-w/--watch`, `--no-serve`; alias: `open-cards`) |
 | `vip export` | Export all profiles for backup |
 | `vip import` | Restore profiles from backup |
 | `vip digest` | Show recent profile changes |
 | `vip monitor start\|stop\|status\|run` | Manage automatic profile refresh |
+| `vip annotate <name> <note>` | Add personal annotation |
+| `vip upgrade` | Update to latest npm version |
+| `vip reset` | Delete all data (`-y` to skip confirmation) |
 | `vip config` | View settings |
 
 ## Features
@@ -123,4 +126,4 @@ vip digest           # View recent changes
 vip config           # View settings
 ```
 
-Settings: `~/.vip/config.json` | Profiles: `~/Projects/vip-crm/profiles/`
+Settings: `~/.vip/config.json` | Profiles: `~/.vip/profiles/`
