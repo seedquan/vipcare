@@ -734,6 +734,35 @@ program.command('tags')
     }
   });
 
+// --- upgrade ---
+program.command('upgrade')
+  .description('Update vipcare to the latest version')
+  .action(() => {
+    console.log(c.cyan(`Current version: ${pkg.version}`));
+    console.log(c.dim('Checking for updates...'));
+    try {
+      const latest = execFileSync('npm', ['view', 'vipcare', 'version'], {
+        encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+
+      if (latest === pkg.version) {
+        console.log(c.green(`Already up to date (${pkg.version}).`));
+        return;
+      }
+
+      console.log(c.yellow(`New version available: ${latest}`));
+      console.log(c.dim('Installing...'));
+      execFileSync('npm', ['install', '-g', `vipcare@${latest}`], {
+        stdio: 'inherit', timeout: 60000,
+      });
+      console.log(c.green(`Updated to ${latest}!`));
+    } catch (e) {
+      console.error(c.red(`Upgrade failed: ${e.message}`));
+      console.log(c.dim('Try manually: npm install -g vipcare@latest'));
+      process.exit(1);
+    }
+  });
+
 // --- config ---
 program.command('config')
   .description('View/edit settings')
