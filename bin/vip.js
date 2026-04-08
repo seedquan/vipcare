@@ -801,19 +801,15 @@ program.command('init')
       const { CONFIG_FILE: cfgPath } = await import('../lib/config.js');
       console.log(c.green(`\nConfig saved to ${cfgPath}`));
 
-      // Install Claude Code skill
+      // Install Claude Code skill by default
       const skillSrc = new URL('../skill/vip.md', import.meta.url);
       const skillDest = path.join(os.homedir(), '.claude', 'commands', 'vip.md');
 
       if (fs.existsSync(new URL(skillSrc).pathname)) {
-        console.log(`\n${c.cyan('Claude Code /vip skill:')}`);
-        const installSkill = await rl.question(`  Install /vip slash command for Claude Code? (Y/n) > `);
-        if (!installSkill.trim() || installSkill.trim().toLowerCase().startsWith('y')) {
-          fs.mkdirSync(path.dirname(skillDest), { recursive: true });
-          fs.copyFileSync(new URL(skillSrc).pathname, skillDest);
-          console.log(c.green(`  Installed: ${skillDest}`));
-          console.log(c.dim('  Use /vip in Claude Code to manage profiles with natural language'));
-        }
+        fs.mkdirSync(path.dirname(skillDest), { recursive: true });
+        fs.copyFileSync(new URL(skillSrc).pathname, skillDest);
+        console.log(c.green(`\n/vip skill installed: ${skillDest}`));
+        console.log(c.dim('  Use /vip in Claude Code to manage profiles with natural language'));
       }
 
       console.log(`\nYou're ready! Try: ${c.cyan('vip add "Sam Altman" --company "OpenAI"')}\n`);
