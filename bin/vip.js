@@ -862,7 +862,7 @@ program.command('init')
       console.log(c.bold(c.cyan('\nChecking dependencies...\n')));
 
       const deps = [
-        { name: 'bird', label: 'Bird CLI (Twitter data)', install: 'npm install -g @nickytonline/bird', check: () => checkTool('bird') },
+        { name: 'bird', label: 'Bird CLI (Twitter data)', install: 'npm install -g @steipete/bird', check: () => checkTool('bird') },
         { name: 'ddgs', label: 'DDGS (web search)', install: 'pip install ddgs', check: () => checkTool('ddgs') || fs.existsSync(path.join(os.homedir(), 'Library', 'Python', '3.9', 'bin', 'ddgs')) },
         { name: 'claude', label: 'Claude Code CLI (AI synthesis)', install: 'npm install -g @anthropic-ai/claude-code', check: () => checkTool('claude') },
         { name: 'yt-dlp', label: 'yt-dlp (YouTube download)', install: 'pip install yt-dlp', check: () => checkTool('yt-dlp') },

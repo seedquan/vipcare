@@ -73,7 +73,7 @@ vip update sam-altman
 ## Features
 
 - **Auto profile building** — Give a name or URL, get a structured profile
-- **Multi-source data** — Twitter (via [bird CLI](https://github.com/nickytonline/bird)), LinkedIn, web search
+- **Multi-source data** — Twitter (via [bird CLI](https://github.com/steipete/bird)), LinkedIn, web search
 - **AI synthesis** — Claude CLI, Anthropic API, or GitHub Copilot CLI
 - **Auto monitoring** — Scheduled profile refresh with change detection (macOS launchd)
 - **Markdown output** — One `.md` file per person
