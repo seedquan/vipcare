@@ -1,6 +1,6 @@
 {
   "name": "vipcare",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Auto-build VIP person profiles from Twitter/LinkedIn public data",
   "type": "module",
   "bin": {
