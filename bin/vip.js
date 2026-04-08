@@ -847,6 +847,48 @@ program.command('reset')
     console.log(c.green('\nAll data cleared. Run "vip init" to start fresh.'));
   });
 
+// --- annotate ---
+program.command('annotate')
+  .description('Add a personal annotation/comment to a profile')
+  .argument('<name>', 'Profile name')
+  .argument('<note...>', 'Your annotation')
+  .action((name, noteParts) => {
+    const content = loadProfile(name);
+    if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
+
+    const note = noteParts.join(' ');
+    const personSlug = slugify(name);
+    const rawDir = path.join(getProfilesDir(), '.raw', personSlug);
+    fs.mkdirSync(rawDir, { recursive: true });
+
+    const annotationFile = path.join(rawDir, 'user_annotations.md');
+    const timestamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const entry = `\n- [${timestamp}] ${note}\n`;
+
+    if (fs.existsSync(annotationFile)) {
+      fs.appendFileSync(annotationFile, entry);
+    } else {
+      fs.writeFileSync(annotationFile, `# User Annotations for ${name}\n\nPersonal notes, observations, and meeting history.\n${entry}`);
+    }
+
+    // Also add to profile's Notes section
+    const updatedContent = loadProfile(name);
+    if (updatedContent) {
+      let newContent;
+      if (updatedContent.includes('## Notes')) {
+        newContent = updatedContent.replace('## Notes\n', `## Notes\n- [${timestamp}] ${note}\n`);
+      } else if (updatedContent.includes('\n---\n')) {
+        newContent = updatedContent.replace('\n---\n', `\n## Notes\n- [${timestamp}] ${note}\n\n---\n`);
+      } else {
+        newContent = updatedContent.trimEnd() + `\n\n## Notes\n- [${timestamp}] ${note}\n`;
+      }
+      saveProfile(name, newContent);
+    }
+
+    console.log(c.green(`Annotation added to ${name}`));
+    console.log(c.dim(`  Saved to: ${annotationFile}`));
+  });
+
 // --- upgrade ---
 program.command('upgrade')
   .description('Update vipcare to the latest version')
