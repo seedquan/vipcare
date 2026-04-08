@@ -825,22 +825,22 @@ program.command('init')
       const profilesDir = profilesAnswer.trim() || defaultDir;
 
       console.log(`\n${c.cyan('AI backend preference:')}`);
-      console.log('  1. Auto-detect (recommended)');
-      console.log('  2. Claude CLI');
-      console.log('  3. Anthropic API');
-      console.log('  4. GitHub Copilot CLI');
-      const backendAnswer = await rl.question('  > ');
+      console.log('  1. Claude CLI (recommended)');
+      console.log('  2. Anthropic API');
+      console.log('  3. GitHub Copilot CLI');
+      console.log('  4. Auto-detect');
+      const backendAnswer = await rl.question('  (default: 1) > ');
       const backendChoice = backendAnswer.trim() || '1';
 
-      const backendMap = { '1': 'auto', '2': 'claude-cli', '3': 'anthropic', '4': 'copilot-cli' };
-      const aiBackend = backendMap[backendChoice] || 'auto';
+      const backendMap = { '1': 'claude-cli', '2': 'anthropic', '3': 'copilot-cli', '4': 'auto' };
+      const aiBackend = backendMap[backendChoice] || 'claude-cli';
 
       const config = {
         profiles_dir: profilesDir.replace(/^~/, os.homedir()),
         ai_backend: aiBackend,
       };
 
-      if (aiBackend === 'anthropic') {
+      if (backendChoice === '2' || aiBackend === 'anthropic') {
         const apiKey = await rl.question('\nAnthropic API key: ');
         if (apiKey.trim()) {
           config.anthropic_api_key = apiKey.trim();
