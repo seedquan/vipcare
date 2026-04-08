@@ -475,7 +475,7 @@ program.command('youtube-search')
 // --- card ---
 program.command('card')
   .description('Generate and serve H5 baseball card page')
-  .option('-o, --output <path>', 'Output HTML file', 'web/index.html')
+  .option('-o, --output <path>', 'Output HTML file', path.join(os.homedir(), '.vip', 'cards', 'index.html'))
   .option('-p, --port <port>', 'Server port', '3000')
   .option('-w, --watch', 'Watch profile files and auto-regenerate')
   .option('--no-serve', 'Only generate, do not start server')
@@ -816,7 +816,7 @@ program.command('reset')
     }
 
     // Delete generated web files
-    const webDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'web');
+    const webDir = path.join(CONFIG_DIR, 'cards');
     if (fs.existsSync(webDir)) {
       const webFiles = fs.readdirSync(webDir).filter(f => f.endsWith('.html'));
       for (const f of webFiles) fs.unlinkSync(path.join(webDir, f));
@@ -884,9 +884,11 @@ program.command('init')
     try {
       console.log(c.bold(c.cyan('\nWelcome to VIPCare!\n')));
 
-      const defaultDir = path.join(os.homedir(), '.vip', 'profiles');
-      const profilesAnswer = await rl.question(`Where should profiles be stored?\n  (default: ${defaultDir}) > `);
-      const profilesDir = profilesAnswer.trim() || defaultDir;
+      const defaultHome = path.join(os.homedir(), '.vip');
+      const homeAnswer = await rl.question(`VIPCare home directory (all data stored here):\n  (default: ${defaultHome}) > `);
+      const homeDir = (homeAnswer.trim() || defaultHome).replace(/^~/, os.homedir());
+
+      const profilesDir = path.join(homeDir, 'profiles');
 
       console.log(`\n${c.cyan('AI backend preference:')}`);
       console.log('  1. Claude CLI (recommended)');
