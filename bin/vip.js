@@ -134,7 +134,12 @@ program.command('add')
     console.log(c.cyan(`Resolving ${query}...`));
 
     let person;
-    if (isUrl(query)) {
+    // Support @handle as shortcut for Twitter URL
+    if (query.startsWith('@')) {
+      const handle = query.replace('@', '');
+      console.log(c.dim(`  Treating as Twitter handle: @${handle}`));
+      person = resolveFromUrl(`https://twitter.com/${handle}`);
+    } else if (isUrl(query)) {
       const stop = spinner('Searching for profile...');
       person = resolveFromUrl(query);
       stop();
@@ -190,7 +195,15 @@ program.command('add')
       }
     }
 
-    if (!rawData.trim()) { console.error(c.red('No data found.')); process.exit(1); }
+    if (!rawData.trim()) {
+      console.error(c.red('No data found for this person.'));
+      console.error(c.dim('  This person may not have a Wikipedia page or public profile indexed by search.'));
+      console.error(c.dim('  Try one of these:'));
+      console.error(c.dim(`    vip add @twitterhandle              # Use their Twitter handle`));
+      console.error(c.dim(`    vip add https://twitter.com/handle   # Use their Twitter URL`));
+      console.error(c.dim(`    vip add "${person.name}" -c "Company" # Add company for better search`));
+      process.exit(1);
+    }
 
     let profile;
     if (opts.ai === false) {
