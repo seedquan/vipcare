@@ -1,4 +1,4 @@
-import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { execFileSync } from 'child_process';
 import fs from 'fs';
@@ -203,3 +203,195 @@ describe('vip import', () => {
     }
   });
 });
+
+describe('vip compare', () => {
+  it('exits non-zero for missing first profile', () => {
+    const { exitCode } = run(['compare', 'nonexistent-aaa', 'nonexistent-bbb']);
+    assert.notStrictEqual(exitCode, 0);
+  });
+
+  it('exits non-zero for missing second profile', () => {
+    // sam-altman exists but nonexistent does not
+    const { exitCode } = run(['compare', 'sam-altman', 'nonexistent-xyz-999']);
+    assert.notStrictEqual(exitCode, 0);
+  });
+
+  it('compares two profiles and shows side-by-side', () => {
+    // Create a second test profile (import saves by name, so slug is "test-person")
+    const tmpFile = createTempImport([{
+      slug: 'test-person',
+      name: 'Test Person',
+      content: '# Test Person\n\n> A test\n\n## Basic Info\n- **Title:** CTO\n- **Company:** TestCo\n\n---\n*Last updated: 2026-01-01*',
+    }]);
+    run(['import', '-f', tmpFile]);
+
+    const { stdout, exitCode } = run(['compare', 'sam-altman', 'test-person']);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('vs'), 'should show vs header');
+
+    // Cleanup
+    run(['rm', 'test-person', '-y']);
+  });
+
+  it('outputs JSON with --json flag', () => {
+    const tmpFile = createTempImport([{
+      slug: 'compare-json',
+      name: 'Compare JSON',
+      content: '# Compare JSON\n\n> Test\n\n## Basic Info\n- **Title:** VP\n- **Company:** ACME\n\n---\n',
+    }]);
+    run(['import', '-f', tmpFile]);
+
+    const { stdout, exitCode } = run(['compare', 'sam-altman', 'compare-json', '--json']);
+    assert.strictEqual(exitCode, 0);
+    const data = JSON.parse(stdout);
+    assert.ok(data.profile1, 'should have profile1');
+    assert.ok(data.profile2, 'should have profile2');
+    assert.ok(Array.isArray(data.shared), 'should have shared array');
+
+    // Cleanup
+    run(['rm', 'compare-json', '-y']);
+  });
+});
+
+describe('vip tag / untag / tags', () => {
+  const tagTestSlug = 'tag-test-person';
+
+  beforeEach(() => {
+    const tmpFile = createTempImport([{
+      slug: tagTestSlug,
+      name: 'Tag Test Person',
+      content: '# Tag Test Person\n\n> A test person\n\n## Basic Info\n- **Title:** Engineer\n\n---\n*Last updated: 2026-01-01*',
+    }]);
+    run(['import', '-f', tmpFile]);
+  });
+
+  afterEach(() => {
+    run(['rm', tagTestSlug, '-y']);
+  });
+
+  it('adds a tag to a profile', () => {
+    const { stdout, exitCode } = run(['tag', tagTestSlug, 'investor']);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('Tagged'), 'should confirm tag added');
+
+    const { stdout: showOut } = run(['show', tagTestSlug]);
+    assert.ok(showOut.includes('investor'), 'profile should contain the tag');
+  });
+
+  it('skips duplicate tags', () => {
+    run(['tag', tagTestSlug, 'investor']);
+    const { stdout, exitCode } = run(['tag', tagTestSlug, 'investor']);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('already exists'), 'should warn about duplicate');
+  });
+
+  it('removes a tag', () => {
+    run(['tag', tagTestSlug, 'investor']);
+    run(['tag', tagTestSlug, 'founder']);
+    const { stdout, exitCode } = run(['untag', tagTestSlug, 'investor']);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('Removed'), 'should confirm tag removed');
+
+    const { stdout: showOut } = run(['show', tagTestSlug]);
+    assert.ok(!showOut.includes('investor'), 'profile should not contain removed tag');
+    assert.ok(showOut.includes('founder'), 'profile should keep other tags');
+  });
+
+  it('removes Tags section when last tag is removed', () => {
+    run(['tag', tagTestSlug, 'solo-tag']);
+    run(['untag', tagTestSlug, 'solo-tag']);
+    const { stdout: showOut } = run(['show', tagTestSlug]);
+    assert.ok(!showOut.includes('## Tags'), 'Tags section should be removed');
+  });
+
+  it('untag warns if tag not found', () => {
+    const { stdout } = run(['untag', tagTestSlug, 'nonexistent-tag']);
+    assert.ok(stdout.includes('not found') || stdout.includes('No tags'), 'should warn about missing tag');
+  });
+
+  it('lists tags for a specific profile', () => {
+    run(['tag', tagTestSlug, 'ai-leader']);
+    run(['tag', tagTestSlug, 'investor']);
+    const { stdout, exitCode } = run(['tags', tagTestSlug]);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('ai-leader'), 'should list ai-leader tag');
+    assert.ok(stdout.includes('investor'), 'should list investor tag');
+  });
+
+  it('lists tags --json for a profile', () => {
+    run(['tag', tagTestSlug, 'tech']);
+    const { stdout, exitCode } = run(['tags', tagTestSlug, '--json']);
+    assert.strictEqual(exitCode, 0);
+    const data = JSON.parse(stdout);
+    assert.ok(Array.isArray(data), 'should be an array');
+    assert.ok(data.includes('tech'), 'should contain the tag');
+  });
+
+  it('lists all tags across profiles', () => {
+    run(['tag', tagTestSlug, 'global-tag']);
+    const { stdout, exitCode } = run(['tags']);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('global-tag'), 'should list the tag');
+  });
+
+  it('lists all tags --json', () => {
+    run(['tag', tagTestSlug, 'json-tag']);
+    const { stdout, exitCode } = run(['tags', '--json']);
+    assert.strictEqual(exitCode, 0);
+    const data = JSON.parse(stdout);
+    assert.ok(typeof data === 'object', 'should be an object');
+    assert.ok(data['json-tag'] >= 1, 'should have count for json-tag');
+  });
+});
+
+describe('vip list --tag', () => {
+  const filterSlug = 'filter-test-person';
+
+  before(() => {
+    const tmpFile = createTempImport([{
+      slug: filterSlug,
+      name: 'Filter Test Person',
+      content: '# Filter Test Person\n\n> Test\n\n## Tags\n- special-filter-tag\n\n---\n',
+    }]);
+    run(['import', '-f', tmpFile]);
+  });
+
+  after(() => {
+    run(['rm', filterSlug, '-y']);
+  });
+
+  it('filters profiles by tag', () => {
+    const { stdout, exitCode } = run(['list', '--tag', 'special-filter-tag']);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('Filter Test Person'), 'should show tagged profile');
+  });
+
+  it('returns no profiles for unknown tag', () => {
+    const { stdout, exitCode } = run(['list', '--tag', 'nonexistent-tag-xyz']);
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stdout.includes('No profiles') || !stdout.includes('Total'), 'should show no profiles');
+  });
+
+  it('works with --json flag', () => {
+    const { stdout, exitCode } = run(['list', '--tag', 'special-filter-tag', '--json']);
+    assert.strictEqual(exitCode, 0);
+    const data = JSON.parse(stdout);
+    assert.ok(Array.isArray(data), 'should be an array');
+    assert.ok(data.some(p => p.slug === filterSlug), 'should contain the tagged profile');
+  });
+
+  it('--json returns empty array for unknown tag', () => {
+    const { stdout, exitCode } = run(['list', '--tag', 'nonexistent-tag-xyz', '--json']);
+    assert.strictEqual(exitCode, 0);
+    const data = JSON.parse(stdout);
+    assert.ok(Array.isArray(data), 'should be an array');
+    assert.strictEqual(data.length, 0, 'should be empty');
+  });
+});
+
+// Helper to create a temp import file
+function createTempImport(entries) {
+  const tmpFile = path.join(os.tmpdir(), `vip-test-import-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+  fs.writeFileSync(tmpFile, JSON.stringify(entries), 'utf-8');
+  return tmpFile;
+}

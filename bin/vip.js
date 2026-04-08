@@ -178,8 +178,21 @@ program.command('add')
 program.command('list')
   .description('List all VIP profiles')
   .option('--json', 'Output as JSON')
+  .option('--tag <tag>', 'Filter by tag')
   .action((opts) => {
-    const profiles = listProfiles();
+    let profiles = listProfiles();
+
+    if (opts.tag) {
+      profiles = profiles.filter(p => {
+        const content = loadProfile(p.slug);
+        if (!content) return false;
+        const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
+        if (!tagsMatch) return false;
+        const tags = tagsMatch[1].split('\n').filter(l => l.match(/^- /)).map(l => l.replace(/^- /, '').trim());
+        return tags.includes(opts.tag);
+      });
+    }
+
     if (opts.json) {
       const data = profiles.map(p => ({ slug: p.slug, name: p.name, summary: p.summary, updated: p.updated, path: p.path }));
       console.log(JSON.stringify(data, null, 2));
@@ -499,6 +512,226 @@ mon.command('run').description('Run monitoring now').option('-v, --verbose', 'Ve
     for (const ch of changes) console.log(`  - ${ch.name}: ${ch.summary}`);
   } else console.log(c.dim('No significant changes detected.'));
 });
+
+// --- compare ---
+program.command('compare')
+  .description('Compare two VIP profiles side by side')
+  .argument('<name1>', 'First profile name')
+  .argument('<name2>', 'Second profile name')
+  .option('--json', 'Output as JSON')
+  .action((name1, name2, opts) => {
+    const content1 = loadProfile(name1);
+    if (!content1) { console.error(c.red(`Profile not found: ${name1}`)); process.exit(1); }
+    const content2 = loadProfile(name2);
+    if (!content2) { console.error(c.red(`Profile not found: ${name2}`)); process.exit(1); }
+
+    function parseProfile(content) {
+      const vip = extractVipData(content);
+      if (vip) return vip;
+
+      const nameMatch = content.match(/^# (.+)$/m);
+      const titleMatch = content.match(/\*\*Title:\*\*\s*(.+)/);
+      const companyMatch = content.match(/\*\*Company:\*\*\s*(.+)/);
+      const locationMatch = content.match(/\*\*Location:\*\*\s*(.+)/);
+      const discMatch = content.match(/\*\*DISC:\*\*\s*(.+)/);
+      const mbtiMatch = content.match(/\*\*MBTI:\*\*\s*(.+)/);
+      const industryMatch = content.match(/\*\*Industry:\*\*\s*(.+)/);
+
+      // Parse tags from ## Tags section
+      const tags = [];
+      const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
+      if (tagsMatch) {
+        for (const line of tagsMatch[1].split('\n')) {
+          const m = line.match(/^- (.+)/);
+          if (m) tags.push(m[1].trim());
+        }
+      }
+      if (industryMatch && !tags.length) tags.push(industryMatch[1].trim());
+
+      return {
+        name: nameMatch ? nameMatch[1] : '',
+        title: titleMatch ? titleMatch[1].trim() : '',
+        company: companyMatch ? companyMatch[1].trim() : '',
+        location: locationMatch ? locationMatch[1].trim() : '',
+        disc: discMatch ? discMatch[1].trim() : '',
+        mbti: mbtiMatch ? mbtiMatch[1].trim() : '',
+        tags,
+      };
+    }
+
+    const p1 = parseProfile(content1);
+    const p2 = parseProfile(content2);
+
+    const name1Display = p1.name || name1;
+    const name2Display = p2.name || name2;
+
+    const tags1 = (p1.tags || []).map(t => t.toLowerCase());
+    const tags2 = (p2.tags || []).map(t => t.toLowerCase());
+    const shared = tags1.filter(t => tags2.includes(t));
+    const unique1 = tags1.filter(t => !tags2.includes(t));
+    const unique2 = tags2.filter(t => !tags1.includes(t));
+
+    if (opts.json) {
+      console.log(JSON.stringify({
+        profile1: { name: name1Display, title: p1.title, company: p1.company, location: p1.location, disc: p1.disc, mbti: p1.mbti, tags: p1.tags },
+        profile2: { name: name2Display, title: p2.title, company: p2.company, location: p2.location, disc: p2.disc, mbti: p2.mbti, tags: p2.tags },
+        shared,
+        uniqueToFirst: unique1,
+        uniqueToSecond: unique2,
+      }, null, 2));
+      return;
+    }
+
+    const col1W = Math.max(20, name1Display.length + 4);
+    const col2W = Math.max(20, name2Display.length + 4);
+    const labelW = 16;
+
+    console.log();
+    console.log(c.bold(c.cyan(`${name1Display} vs ${name2Display}`)));
+    console.log('═'.repeat(labelW + col1W + col2W));
+
+    console.log(`${''.padEnd(labelW)}${c.bold(name1Display.padEnd(col1W))}${c.bold(name2Display.padEnd(col2W))}`);
+
+    const fields = [
+      ['Title:', p1.title, p2.title],
+      ['Company:', p1.company, p2.company],
+      ['Location:', p1.location, p2.location],
+      ['DISC:', p1.disc, p2.disc],
+      ['MBTI:', p1.mbti, p2.mbti],
+    ];
+
+    for (const [label, v1, v2] of fields) {
+      if (!v1 && !v2) continue;
+      console.log(`${c.dim(label.padEnd(labelW))}${(v1 || c.dim('—')).toString().padEnd(col1W)}${(v2 || c.dim('—')).toString().padEnd(col2W)}`);
+    }
+
+    console.log();
+    if (shared.length) console.log(`${c.green('Shared interests:')} ${shared.join(', ')}`);
+    if (unique1.length) console.log(`${c.cyan(`Unique to ${name1Display}:`)} ${unique1.join(', ')}`);
+    if (unique2.length) console.log(`${c.cyan(`Unique to ${name2Display}:`)} ${unique2.join(', ')}`);
+    if (!shared.length && !unique1.length && !unique2.length) console.log(c.dim('No tags to compare.'));
+    console.log();
+  });
+
+// --- tag ---
+program.command('tag')
+  .description('Add a tag to a profile')
+  .argument('<name>', 'Profile name')
+  .argument('<tag>', 'Tag to add')
+  .action((name, tag) => {
+    let content = loadProfile(name);
+    if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
+
+    const tagLine = `- ${tag}`;
+    const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
+
+    if (tagsMatch) {
+      const existingTags = tagsMatch[1].split('\n').filter(l => l.match(/^- /)).map(l => l.replace(/^- /, '').trim());
+      if (existingTags.includes(tag)) {
+        console.log(c.yellow(`Tag '${tag}' already exists on ${name}.`));
+        return;
+      }
+      content = content.replace(tagsMatch[0], tagsMatch[0].trimEnd() + '\n' + tagLine);
+    } else if (content.includes('\n---\n')) {
+      content = content.replace('\n---\n', `\n## Tags\n${tagLine}\n\n---\n`);
+    } else {
+      content = content.trimEnd() + `\n\n## Tags\n${tagLine}\n`;
+    }
+
+    saveProfile(name, content);
+    console.log(c.green(`Tagged ${name} with '${tag}'.`));
+  });
+
+// --- untag ---
+program.command('untag')
+  .description('Remove a tag from a profile')
+  .argument('<name>', 'Profile name')
+  .argument('<tag>', 'Tag to remove')
+  .action((name, tag) => {
+    let content = loadProfile(name);
+    if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
+
+    const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
+    if (!tagsMatch) {
+      console.log(c.yellow(`No tags found on ${name}.`));
+      return;
+    }
+
+    const lines = tagsMatch[1].split('\n').filter(l => l.match(/^- /));
+    const remaining = lines.filter(l => l.replace(/^- /, '').trim() !== tag);
+
+    if (remaining.length === lines.length) {
+      console.log(c.yellow(`Tag '${tag}' not found on ${name}.`));
+      return;
+    }
+
+    if (remaining.length === 0) {
+      // Remove the entire Tags section
+      content = content.replace(/\n?## Tags\n[\s\S]*?(?=\n##|\n---|$)/, '');
+    } else {
+      content = content.replace(tagsMatch[0], '## Tags\n' + remaining.join('\n'));
+    }
+
+    saveProfile(name, content);
+    console.log(c.green(`Removed tag '${tag}' from ${name}.`));
+  });
+
+// --- tags ---
+program.command('tags')
+  .description('List tags across profiles or for a specific profile')
+  .argument('[name]', 'Profile name (optional)')
+  .option('--json', 'Output as JSON')
+  .action((name, opts) => {
+    function parseTags(content) {
+      const tags = [];
+      const tagsMatch = content.match(/## Tags\n([\s\S]*?)(?=\n##|\n---|$)/);
+      if (tagsMatch) {
+        for (const line of tagsMatch[1].split('\n')) {
+          const m = line.match(/^- (.+)/);
+          if (m) tags.push(m[1].trim());
+        }
+      }
+      return tags;
+    }
+
+    if (name) {
+      const content = loadProfile(name);
+      if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
+
+      const tags = parseTags(content);
+      if (opts.json) {
+        console.log(JSON.stringify(tags, null, 2));
+        return;
+      }
+      if (!tags.length) { console.log(c.dim(`No tags on ${name}.`)); return; }
+      console.log(c.bold(c.cyan(`Tags for ${name}:\n`)));
+      for (const t of tags) console.log(`  - ${t}`);
+      console.log();
+    } else {
+      const profiles = listProfiles();
+      const counts = {};
+      for (const p of profiles) {
+        const content = loadProfile(p.slug);
+        if (!content) continue;
+        for (const t of parseTags(content)) {
+          counts[t] = (counts[t] || 0) + 1;
+        }
+      }
+
+      if (opts.json) {
+        console.log(JSON.stringify(counts, null, 2));
+        return;
+      }
+
+      const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      if (!entries.length) { console.log(c.dim('No tags found across any profiles.')); return; }
+      console.log(c.bold(c.cyan('All tags:\n')));
+      for (const [tag, count] of entries) {
+        console.log(`  ${tag.padEnd(30)} ${c.dim(`(${count})`)}`);
+      }
+      console.log();
+    }
+  });
 
 // --- config ---
 program.command('config')

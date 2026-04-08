@@ -44,6 +44,9 @@ No public information found.
 - Twitter handle @sama has been active since July 2006
 - Note: multiple unrelated individuals share the "Sama" name on LinkedIn; none of those profiles correspond to Sam Altman
 
+## Tags
+- ai-leader
+- investor
 ---
 *Last updated: 2026-04-07*
 *Sources: https://www.linkedin.com/in/andrew-a-sama-md-4bb65242*
