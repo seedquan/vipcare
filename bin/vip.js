@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import fs from 'fs';
 import os from 'os';
-import { execSync as exec } from 'child_process';
+import { execFileSync } from 'child_process';
 import { checkTool, getProfilesDir, loadConfig, saveConfig } from '../lib/config.js';
 import { deleteProfile, getProfilePath, listProfiles, loadProfile, profileExists, saveProfile, searchProfiles } from '../lib/profile.js';
 import { isUrl, resolveFromName, resolveFromUrl } from '../lib/resolver.js';
@@ -230,7 +230,7 @@ program.command('open')
     const p = getProfilePath(name);
     if (!fs.existsSync(p)) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
     const editor = process.env.EDITOR || 'open';
-    exec(`${editor} "${p}"`);
+    execFileSync(editor, [p], { stdio: 'inherit' });
   });
 
 // --- update ---
@@ -442,4 +442,4 @@ program.command('config')
     console.log(`  AI backend: ${(() => { const b = getBackendName(); return b !== 'none' ? c.green(b) : c.red('not found'); })()}`);
   });
 
-program.parse();
+program.parseAsync();
