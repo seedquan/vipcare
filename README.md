@@ -42,6 +42,27 @@ vip rm sam-altman -y
 vip update sam-altman
 ```
 
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `vip add <name-or-url>` | Add a new profile (`-c` company, `-f` force, `--no-ai`, `--dry-run`, `-y` YouTube URLs) |
+| `vip list` | List all profiles |
+| `vip show <name>` | Display a profile |
+| `vip search <keyword>` | Search across all profiles |
+| `vip edit <name>` | Edit profile fields (`--title`, `--company`, `--twitter`, `--linkedin`, `--note`) |
+| `vip rm <name>` | Delete a profile (`-y` to confirm) |
+| `vip update <name>` | Refresh a profile with latest data |
+| `vip open <name>` | Open a profile in your editor |
+| `vip youtube <name> <url>` | Add YouTube video transcript to a profile |
+| `vip youtube-search <name>` | Search YouTube for a person's talks (`-n` max results) |
+| `vip card` | Generate H5 baseball card page (`-o` output path) |
+| `vip export` | Export all profiles for backup |
+| `vip import` | Restore profiles from backup |
+| `vip digest` | Show recent profile changes |
+| `vip monitor start\|stop\|status\|run` | Manage automatic profile refresh |
+| `vip config` | View settings |
+
 ## Features
 
 - **Auto profile building** — Give a name or URL, get a structured profile

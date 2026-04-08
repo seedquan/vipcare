@@ -13,7 +13,7 @@ import { synthesizeProfile, getBackendName } from '../lib/synthesizer.js';
 import { readChangelog, runMonitor, unreadCount } from '../lib/monitor.js';
 import { install, uninstall, status } from '../lib/scheduler.js';
 import * as youtube from '../lib/fetchers/youtube.js';
-import { generateCards } from '../lib/card.js';
+import { generateCards, extractVipData } from '../lib/card.js';
 
 // Colors
 const c = {
@@ -479,6 +479,81 @@ program.command('config')
     console.log(`  Monitor interval: ${cfg.monitor_interval_hours}h`);
     console.log(`  Bird CLI: ${checkTool('bird') ? c.green('available') : c.red('not found')}`);
     console.log(`  AI backend: ${(() => { const b = getBackendName(); return b !== 'none' ? c.green(b) : c.red('not found'); })()}`);
+  });
+
+// --- export ---
+program.command('export')
+  .description('Export all profiles as JSON')
+  .option('-o, --output <file>', 'Write JSON to file instead of stdout')
+  .action((opts) => {
+    const profiles = listProfiles();
+    if (!profiles.length) { console.error(c.red('No profiles to export.')); process.exit(1); }
+
+    const exported = profiles.map(p => {
+      const content = loadProfile(p.slug);
+      const vipData = content ? extractVipData(content) : null;
+      return {
+        slug: p.slug,
+        filePath: p.path,
+        name: p.name,
+        summary: p.summary,
+        updated: p.updated,
+        vipData: vipData || null,
+        content: content || '',
+        exportedAt: new Date().toISOString(),
+      };
+    });
+
+    const json = JSON.stringify(exported, null, 2);
+
+    if (opts.output) {
+      fs.writeFileSync(opts.output, json, 'utf-8');
+      console.log(c.green(`Exported ${exported.length} profile(s) to ${opts.output}`));
+    } else {
+      process.stdout.write(json + '\n');
+    }
+  });
+
+// --- import ---
+program.command('import')
+  .description('Import profiles from a JSON export file')
+  .argument('<file>', 'JSON file to import')
+  .option('-f, --force', 'Overwrite existing profiles')
+  .action((file, opts) => {
+    if (!fs.existsSync(file)) { console.error(c.red(`File not found: ${file}`)); process.exit(1); }
+
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(file, 'utf-8'));
+    } catch (e) {
+      console.error(c.red(`Invalid JSON: ${e.message}`));
+      process.exit(1);
+    }
+
+    if (!Array.isArray(data)) { console.error(c.red('Expected a JSON array of profiles.')); process.exit(1); }
+
+    let imported = 0;
+    let skipped = 0;
+    for (const entry of data) {
+      if (!entry.content || !entry.slug) {
+        console.log(c.yellow(`  Skipping entry: missing content or slug`));
+        skipped++;
+        continue;
+      }
+
+      const name = entry.name || entry.slug;
+      if (!opts.force && profileExists(name)) {
+        console.log(c.yellow(`  Skipping '${name}': already exists (use -f to overwrite)`));
+        skipped++;
+        continue;
+      }
+
+      saveProfile(name, entry.content);
+      imported++;
+      console.log(c.green(`  Imported: ${name}`));
+    }
+
+    console.log(`\nDone: ${imported} imported, ${skipped} skipped.`);
   });
 
 program.parseAsync();
