@@ -910,10 +910,10 @@ program.command('init')
 
       const deps = [
         { name: 'bird', label: 'Bird CLI (Twitter data)', install: 'npm install -g @steipete/bird', check: () => checkTool('bird') },
-        { name: 'ddgs', label: 'DDGS (web search)', install: 'pip install ddgs', check: () => checkTool('ddgs') || fs.existsSync(path.join(os.homedir(), 'Library', 'Python', '3.9', 'bin', 'ddgs')) },
+        { name: 'ddgs', label: 'DDGS (web search)', install: 'pip3 install ddgs', check: () => checkTool('ddgs') || fs.existsSync(path.join(os.homedir(), 'Library', 'Python', '3.9', 'bin', 'ddgs')) },
         { name: 'claude', label: 'Claude Code CLI (AI synthesis)', install: 'npm install -g @anthropic-ai/claude-code', check: () => checkTool('claude') },
-        { name: 'yt-dlp', label: 'yt-dlp (YouTube download)', install: 'pip install yt-dlp', check: () => checkTool('yt-dlp') },
-        { name: 'whisper', label: 'Whisper (YouTube transcription)', install: 'pip install openai-whisper', check: () => checkTool('whisper') },
+        { name: 'yt-dlp', label: 'yt-dlp (YouTube download)', install: 'pip3 install yt-dlp', check: () => checkTool('yt-dlp') },
+        { name: 'whisper', label: 'Whisper (YouTube transcription)', install: 'pip3 install openai-whisper', check: () => checkTool('whisper') },
       ];
 
       const missing = [];
