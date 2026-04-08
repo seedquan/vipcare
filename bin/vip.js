@@ -281,6 +281,16 @@ program.command('rm')
     console.log(c.green(`Profile deleted: ${name}`));
   });
 
+function appendNote(content, note) {
+  if (content.includes('## Notes')) {
+    return content.replace('## Notes\n', `## Notes\n- ${note}\n`);
+  } else if (content.includes('\n---\n')) {
+    return content.replace('\n---\n', `\n## Notes\n- ${note}\n\n---\n`);
+  } else {
+    return content.trimEnd() + `\n\n## Notes\n- ${note}\n`;
+  }
+}
+
 // --- edit ---
 program.command('edit')
   .description('Edit profile fields')
@@ -296,14 +306,43 @@ program.command('edit')
 
     let modified = false;
 
-    if (opts.title) { content = content.replace(/(\*\*Title:\*\*) .+/, `$1 ${opts.title}`); modified = true; }
-    if (opts.company) { content = content.replace(/(\*\*Company:\*\*) .+/, `$1 ${opts.company}`); modified = true; }
-    if (opts.twitter) {
-      const handle = opts.twitter.replace(/^@/, '');
-      content = content.replace(/(Twitter:) .+/, `$1 https://twitter.com/${handle}`);
+    if (opts.title) {
+      const before = content;
+      content = content.replace(/(\*\*Title:\*\*) .+/, `$1 ${opts.title}`);
+      if (content === before) {
+        console.log(c.yellow(`  Warning: Could not find Title field to update. Adding to notes instead.`));
+        content = appendNote(content, `Title: ${opts.title}`);
+      }
       modified = true;
     }
-    if (opts.linkedin) { content = content.replace(/(LinkedIn:) .+/, `$1 ${opts.linkedin}`); modified = true; }
+    if (opts.company) {
+      const before = content;
+      content = content.replace(/(\*\*Company:\*\*) .+/, `$1 ${opts.company}`);
+      if (content === before) {
+        console.log(c.yellow(`  Warning: Could not find Company field to update. Adding to notes instead.`));
+        content = appendNote(content, `Company: ${opts.company}`);
+      }
+      modified = true;
+    }
+    if (opts.twitter) {
+      const handle = opts.twitter.replace(/^@/, '');
+      const before = content;
+      content = content.replace(/(Twitter:) .+/, `$1 https://twitter.com/${handle}`);
+      if (content === before) {
+        console.log(c.yellow(`  Warning: Could not find Twitter field to update. Adding to notes instead.`));
+        content = appendNote(content, `Twitter: https://twitter.com/${handle}`);
+      }
+      modified = true;
+    }
+    if (opts.linkedin) {
+      const before = content;
+      content = content.replace(/(LinkedIn:) .+/, `$1 ${opts.linkedin}`);
+      if (content === before) {
+        console.log(c.yellow(`  Warning: Could not find LinkedIn field to update. Adding to notes instead.`));
+        content = appendNote(content, `LinkedIn: ${opts.linkedin}`);
+      }
+      modified = true;
+    }
     if (opts.note) {
       if (content.includes('## Notes')) {
         content = content.replace('## Notes\n', `## Notes\n- ${opts.note}\n`);

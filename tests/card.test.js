@@ -19,4 +19,9 @@ describe('card', () => {
     const content = '<!-- VIP_DATA\n{invalid json}\n-->';
     assert.strictEqual(extractVipData(content), null);
   });
+
+  it('extractVipData returns null for profiles without VIP_DATA block', () => {
+    const content = `# Sam Altman\n\n> CEO of OpenAI\n\n## Basic Info\n- **Title:** CEO\n- **Company:** OpenAI\n- **Location:** San Francisco`;
+    assert.strictEqual(extractVipData(content), null);
+  });
 });

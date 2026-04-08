@@ -1,80 +1,4 @@
-import fs from 'fs';
-import path from 'path';
-import { loadProfile } from './profile.js';
-
-export function extractVipData(content) {
-  const match = content.match(/<!--\s*VIP_DATA\s*\n([\s\S]*?)\n-->/);
-  if (!match) return null;
-
-  try {
-    return JSON.parse(match[1]);
-  } catch {
-    return null;
-  }
-}
-
-export function generateCards(profiles, outputPath = 'web/index.html') {
-  const cards = [];
-
-  for (const p of profiles) {
-    const content = loadProfile(p.slug);
-    if (!content) continue;
-
-    const data = extractVipData(content);
-    if (!data) {
-      // Fallback: parse what we can from markdown headers
-      const nameMatch = content.match(/^# (.+)$/m);
-      const summaryMatch = content.match(/^> (.+)$/m);
-      const titleMatch = content.match(/\*\*Title:\*\*\s*(.+)/);
-      const companyMatch = content.match(/\*\*Company:\*\*\s*(.+)/);
-      const locationMatch = content.match(/\*\*Location:\*\*\s*(.+)/);
-      const industryMatch = content.match(/\*\*Industry:\*\*\s*(.+)/);
-
-      cards.push({
-        name: nameMatch ? nameMatch[1] : p.name,
-        title: titleMatch ? titleMatch[1].trim() : '',
-        company: companyMatch ? companyMatch[1].trim() : '',
-        location: locationMatch ? locationMatch[1].trim() : '',
-        disc: '?',
-        mbti: '?',
-        scores: {},
-        tags: industryMatch ? [industryMatch[1].trim()] : [],
-        icebreakers: [],
-        dos: [],
-        donts: [],
-        gifts: [],
-        expertise: [],
-        superpower: '',
-        quote: summaryMatch ? summaryMatch[1] : (p.summary || ''),
-      });
-      continue;
-    }
-
-    cards.push(data);
-  }
-
-  const html = buildHtml(cards);
-
-  const dir = path.dirname(outputPath);
-  fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(outputPath, html, 'utf-8');
-
-  return path.resolve(outputPath);
-}
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function buildHtml(cards) {
-  // Escape </script> in JSON to prevent XSS
-  const cardsJson = JSON.stringify(cards).replace(/<\//g, '<\\/');
-
-  return `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -154,7 +78,7 @@ h1 { text-align: center; font-size: 1.8em; margin: 20px 0 30px; color: #38bdf8; 
 </div>
 
 <script>
-const cards = ${cardsJson};
+const cards = [{"name":"Sam Altman","title":"CEO","company":"OpenAI","location":"San Francisco, USA","disc":"?","mbti":"?","scores":{},"tags":["Artificial Intelligence"],"icebreakers":[],"dos":[],"donts":[],"gifts":[],"expertise":[],"superpower":"","quote":"CEO of OpenAI, leading the development and deployment of artificial general intelligence"}];
 
 const SCORE_LABELS = {
   openness: 'Openness',
@@ -180,9 +104,9 @@ function radarSvg(scores, size = 200) {
     let pts = [];
     for (let i = 0; i < n; i++) {
       const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
-      pts.push(\`\${cx + lr * Math.cos(angle)},\${cy + lr * Math.sin(angle)}\`);
+      pts.push(`${cx + lr * Math.cos(angle)},${cy + lr * Math.sin(angle)}`);
     }
-    gridLines += \`<polygon points="\${pts.join(' ')}" fill="none" stroke="#334155" stroke-width="0.5"/>\`;
+    gridLines += `<polygon points="${pts.join(' ')}" fill="none" stroke="#334155" stroke-width="0.5"/>`;
   }
 
   let axes = '', labels = '', dataPoints = [];
@@ -190,50 +114,50 @@ function radarSvg(scores, size = 200) {
     const angle = (Math.PI * 2 * i / n) - Math.PI / 2;
     const x = cx + r * Math.cos(angle);
     const y = cy + r * Math.sin(angle);
-    axes += \`<line x1="\${cx}" y1="\${cy}" x2="\${x}" y2="\${y}" stroke="#334155" stroke-width="0.5"/>\`;
+    axes += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#334155" stroke-width="0.5"/>`;
 
     const lx = cx + (r + 18) * Math.cos(angle);
     const ly = cy + (r + 18) * Math.sin(angle);
     const label = SCORE_LABELS[keys[i]] || keys[i];
-    labels += \`<text x="\${lx}" y="\${ly}" text-anchor="middle" dominant-baseline="middle" fill="#64748b" font-size="7">\${label}</text>\`;
+    labels += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" fill="#64748b" font-size="7">${label}</text>`;
 
     const val = (scores[keys[i]] || 0) / 5;
     const dx = cx + r * val * Math.cos(angle);
     const dy = cy + r * val * Math.sin(angle);
-    dataPoints.push(\`\${dx},\${dy}\`);
+    dataPoints.push(`${dx},${dy}`);
   }
 
-  const dataPolygon = \`<polygon points="\${dataPoints.join(' ')}" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" stroke-width="1.5"/>\`;
+  const dataPolygon = `<polygon points="${dataPoints.join(' ')}" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" stroke-width="1.5"/>`;
 
-  return \`<svg viewBox="0 0 \${size} \${size}" class="radar">\${gridLines}\${axes}\${dataPolygon}\${labels}</svg>\`;
+  return `<svg viewBox="0 0 ${size} ${size}" class="radar">${gridLines}${axes}${dataPolygon}${labels}</svg>`;
 }
 
 function renderCard(card, index) {
   const scores = card.scores || {};
   const radar = radarSvg(scores);
 
-  return \`
-    <div class="card" onclick="openModal(\${index})">
+  return `
+    <div class="card" onclick="openModal(${index})">
       <div class="card-header">
         <div>
-          <div class="card-name">\${card.name || 'Unknown'}</div>
-          <div class="card-role">\${card.title || ''}\${card.company ? ' @ ' + card.company : ''}</div>
+          <div class="card-name">${card.name || 'Unknown'}</div>
+          <div class="card-role">${card.title || ''}${card.company ? ' @ ' + card.company : ''}</div>
         </div>
         <div class="card-badges">
-          <span class="badge badge-disc">\${card.disc || '?'}</span>
-          <span class="badge badge-mbti">\${card.mbti || '?'}</span>
+          <span class="badge badge-disc">${card.disc || '?'}</span>
+          <span class="badge badge-mbti">${card.mbti || '?'}</span>
         </div>
       </div>
-      \${card.quote ? \`<div class="card-quote">"\${card.quote.slice(0, 120)}\${card.quote.length > 120 ? '...' : ''}"</div>\` : ''}
-      <div class="radar-container">\${radar}</div>
-      \${card.superpower ? \`<div class="superpower">⚡ \${card.superpower}</div>\` : ''}
-      \${card.tags?.length ? \`<div class="tags">\${card.tags.map(t => \`<span class="tag">\${t}</span>\`).join('')}</div>\` : ''}
+      ${card.quote ? `<div class="card-quote">"${card.quote.slice(0, 120)}${card.quote.length > 120 ? '...' : ''}"</div>` : ''}
+      <div class="radar-container">${radar}</div>
+      ${card.superpower ? `<div class="superpower">⚡ ${card.superpower}</div>` : ''}
+      ${card.tags?.length ? `<div class="tags">${card.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
       <div class="tips">
-        \${card.icebreakers?.length ? \`<div class="tip-row"><span class="tip-icon">💡</span><span class="tip-label">Icebreaker</span>\${card.icebreakers[0]}</div>\` : ''}
-        \${card.dos?.length ? \`<div class="tip-row"><span class="tip-icon">✅</span><span class="tip-label">Do</span>\${card.dos[0]}</div>\` : ''}
-        \${card.donts?.length ? \`<div class="tip-row"><span class="tip-icon">❌</span><span class="tip-label">Don't</span>\${card.donts[0]}</div>\` : ''}
+        ${card.icebreakers?.length ? `<div class="tip-row"><span class="tip-icon">💡</span><span class="tip-label">Icebreaker</span>${card.icebreakers[0]}</div>` : ''}
+        ${card.dos?.length ? `<div class="tip-row"><span class="tip-icon">✅</span><span class="tip-label">Do</span>${card.dos[0]}</div>` : ''}
+        ${card.donts?.length ? `<div class="tip-row"><span class="tip-icon">❌</span><span class="tip-label">Don't</span>${card.donts[0]}</div>` : ''}
       </div>
-    </div>\`;
+    </div>`;
 }
 
 function openModal(index) {
@@ -241,27 +165,27 @@ function openModal(index) {
   const s = card.scores || {};
   const modal = document.getElementById('modal-content');
 
-  modal.innerHTML = \`
+  modal.innerHTML = `
     <button class="modal-close" onclick="closeModal()">&times;</button>
-    <h1 style="color:#38bdf8;margin-bottom:4px">\${card.name}</h1>
-    <p style="color:#94a3b8">\${card.title || ''}\${card.company ? ' @ ' + card.company : ''}\${card.location ? ' · ' + card.location : ''}</p>
-    \${card.quote ? \`<div class="card-quote" style="margin:16px 0">"\${card.quote}"</div>\` : ''}
+    <h1 style="color:#38bdf8;margin-bottom:4px">${card.name}</h1>
+    <p style="color:#94a3b8">${card.title || ''}${card.company ? ' @ ' + card.company : ''}${card.location ? ' · ' + card.location : ''}</p>
+    ${card.quote ? `<div class="card-quote" style="margin:16px 0">"${card.quote}"</div>` : ''}
 
     <h2>Personality</h2>
-    <p><strong>DISC:</strong> \${card.disc || '?'} &nbsp; <strong>MBTI:</strong> \${card.mbti || '?'}</p>
-    <div style="display:flex;justify-content:center;margin:16px 0">\${radarSvg(s, 260)}</div>
+    <p><strong>DISC:</strong> ${card.disc || '?'} &nbsp; <strong>MBTI:</strong> ${card.mbti || '?'}</p>
+    <div style="display:flex;justify-content:center;margin:16px 0">${radarSvg(s, 260)}</div>
 
-    \${card.expertise?.length ? \`<h2>Expertise</h2><ul>\${card.expertise.map(e => \`<li>\${e}</li>\`).join('')}</ul>\` : ''}
-    \${card.superpower ? \`<p><strong>⚡ Superpower:</strong> \${card.superpower}</p>\` : ''}
+    ${card.expertise?.length ? `<h2>Expertise</h2><ul>${card.expertise.map(e => `<li>${e}</li>`).join('')}</ul>` : ''}
+    ${card.superpower ? `<p><strong>⚡ Superpower:</strong> ${card.superpower}</p>` : ''}
 
     <h2>How to Work With Them</h2>
-    \${card.icebreakers?.length ? \`<p><strong>💡 Icebreakers:</strong> \${card.icebreakers.join(', ')}</p>\` : ''}
-    \${card.dos?.length ? \`<p><strong>✅ Do:</strong> \${card.dos.join(' · ')}</p>\` : ''}
-    \${card.donts?.length ? \`<p><strong>❌ Don't:</strong> \${card.donts.join(' · ')}</p>\` : ''}
-    \${card.gifts?.length ? \`<p><strong>🎁 Gifts:</strong> \${card.gifts.join(', ')}</p>\` : ''}
+    ${card.icebreakers?.length ? `<p><strong>💡 Icebreakers:</strong> ${card.icebreakers.join(', ')}</p>` : ''}
+    ${card.dos?.length ? `<p><strong>✅ Do:</strong> ${card.dos.join(' · ')}</p>` : ''}
+    ${card.donts?.length ? `<p><strong>❌ Don't:</strong> ${card.donts.join(' · ')}</p>` : ''}
+    ${card.gifts?.length ? `<p><strong>🎁 Gifts:</strong> ${card.gifts.join(', ')}</p>` : ''}
 
-    \${card.tags?.length ? \`<h2>Tags</h2><div class="tags">\${card.tags.map(t => \`<span class="tag">\${t}</span>\`).join('')}</div>\` : ''}
-  \`;
+    ${card.tags?.length ? `<h2>Tags</h2><div class="tags">${card.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+  `;
 
   document.getElementById('modal').classList.add('active');
 }
@@ -277,5 +201,4 @@ const grid = document.getElementById('grid');
 grid.innerHTML = cards.map((card, i) => renderCard(card, i)).join('');
 </script>
 </body>
-</html>`;
-}
+</html>

@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { slugify, saveProfile, loadProfile, listProfiles, searchProfiles, profileExists, deleteProfile } from '../lib/profile.js';
+import { slugify, validateName, saveProfile, loadProfile, listProfiles, searchProfiles, profileExists, deleteProfile } from '../lib/profile.js';
 
 let tmpDir;
 
@@ -15,6 +15,29 @@ describe('slugify', () => {
   it('basic name', () => assert.strictEqual(slugify('Sam Altman'), 'sam-altman'));
   it('special chars', () => assert.strictEqual(slugify("Dr. John O'Brien"), 'dr-john-obrien'));
   it('extra spaces', () => assert.strictEqual(slugify('  Elon   Musk  '), 'elon-musk'));
+});
+
+describe('validateName', () => {
+  it('accepts valid names', () => {
+    assert.ok(validateName('Sam Altman'));
+    assert.ok(validateName('Elon Musk'));
+  });
+
+  it('rejects empty/null/undefined', () => {
+    assert.ok(!validateName(''));
+    assert.ok(!validateName(null));
+    assert.ok(!validateName(undefined));
+  });
+
+  it('rejects non-strings', () => {
+    assert.ok(!validateName(123));
+    assert.ok(!validateName({}));
+  });
+
+  it('rejects names that slugify to unnamed', () => {
+    assert.ok(!validateName('!!!'));
+    assert.ok(!validateName('   '));
+  });
 });
 
 describe('save and load', () => {
