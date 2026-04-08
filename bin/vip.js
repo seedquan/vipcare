@@ -64,14 +64,16 @@ function gatherData(person) {
 
   if (person.linkedinUrl) sources.push(person.linkedinUrl);
 
+  // Collect all search results into one consolidated file
+  const searchEntries = [];
+
   if (person.rawSnippets.length) {
     rawParts.push('=== Web Search Results ===');
-    rawParts.push(...person.rawSnippets);
-    // Save each snippet as a raw source file
     person.rawSnippets.forEach((snippet, i) => {
-      const url = person.otherUrls?.[i] || `search_result_${i}`;
-      const safeName = url.replace(/https?:\/\//, '').replace(/[^\w.-]/g, '_').substring(0, 60);
-      saveRawSource(personSlug, safeName, `# Search Result\n\nSource: ${url}\nFetched: ${new Date().toISOString()}\n\n${snippet}`);
+      if (!snippet.trim()) return; // skip empty
+      rawParts.push(snippet);
+      const url = person.otherUrls?.[i] || '';
+      if (url) searchEntries.push({ url, snippet });
     });
   }
 
@@ -79,11 +81,22 @@ function gatherData(person) {
     console.log(c.dim(`  Searching the web for ${person.name}...`));
     const results = searchPerson(person.name);
     for (const r of results) {
+      if (!r.body?.trim() && !r.title?.trim()) continue; // skip empty
       rawParts.push(`${r.title}\n${r.body}`);
       if (!sources.includes(r.url)) sources.push(r.url);
-      const safeName = r.url.replace(/https?:\/\//, '').replace(/[^\w.-]/g, '_').substring(0, 60);
-      saveRawSource(personSlug, safeName, `# ${r.title}\n\nSource: ${r.url}\nFetched: ${new Date().toISOString()}\n\n${r.body}`);
+      searchEntries.push({ url: r.url, snippet: `${r.title}\n${r.body}` });
     }
+  }
+
+  // Save all search results in ONE file
+  if (searchEntries.length) {
+    const timestamp = new Date().toISOString();
+    const content = `# Web Search Results\n\nFetched: ${timestamp}\nQuery: ${person.name}\n\n` +
+      searchEntries
+        .filter(e => e.snippet.trim())
+        .map(e => `---\n\n**Source:** ${e.url}\n\n${e.snippet}`)
+        .join('\n\n');
+    saveRawSource(personSlug, 'web_search', content);
   }
 
   console.log(c.dim(`  Raw data saved to ${path.join(getProfilesDir(), '.raw', personSlug)}/`));
