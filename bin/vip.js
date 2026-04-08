@@ -587,4 +587,146 @@ program.command('import')
     console.log(`\nDone: ${imported} imported, ${skipped} skipped.`);
   });
 
+// --- stats ---
+program.command('stats')
+  .description('Show dashboard overview')
+  .option('--json', 'Output as JSON')
+  .action((opts) => {
+    const profiles = listProfiles();
+    const activity = readChangelog(7);
+    const backend = getBackendName();
+    const birdAvailable = checkTool('bird');
+
+    // Find most recently updated profile
+    let lastUpdated = null;
+    let lastUpdatedName = null;
+    for (const p of profiles) {
+      if (!lastUpdated || p.updated > lastUpdated) {
+        lastUpdated = p.updated;
+        lastUpdatedName = p.name;
+      }
+    }
+
+    if (opts.json) {
+      const data = {
+        profileCount: profiles.length,
+        lastUpdated: lastUpdated ? { date: lastUpdated, name: lastUpdatedName } : null,
+        aiBackend: backend,
+        birdCli: birdAvailable ? 'available' : 'not found',
+        recentActivity: activity.map(e => ({
+          date: (e.timestamp || '').slice(0, 10),
+          name: e.name,
+          type: e.type,
+          summary: e.summary,
+        })),
+      };
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
+
+    console.log(c.bold(c.cyan('\nVIPCare Stats')));
+    console.log('─'.repeat(15));
+    console.log(`  Profiles:     ${c.green(String(profiles.length))}`);
+    if (lastUpdated) {
+      console.log(`  Last updated: ${c.green(lastUpdated)} (${lastUpdatedName})`);
+    } else {
+      console.log(`  Last updated: ${c.dim('n/a')}`);
+    }
+    console.log(`  AI backend:   ${backend !== 'none' ? c.green(backend) : c.dim('not found')}`);
+    console.log(`  Bird CLI:     ${birdAvailable ? c.green('available') : c.dim('not found')}`);
+
+    if (activity.length) {
+      console.log(`\n  Recent activity (7 days):`);
+      for (const e of activity) {
+        const date = (e.timestamp || '').slice(0, 10);
+        const label = e.summary || (e.type === 'created' ? 'Profile created' : 'Profile updated');
+        console.log(`    [${date}] ${e.name} — ${label}`);
+      }
+    } else {
+      console.log(`\n  ${c.dim('No recent activity (7 days)')}`);
+    }
+    console.log();
+  });
+
+// --- regenerate ---
+program.command('regenerate')
+  .description('Re-synthesize all profiles with current AI template')
+  .option('--dry-run', 'Show what would be regenerated without doing it')
+  .option('--no-ai', 'Skip AI synthesis (raw data only)')
+  .action(async (opts) => {
+    const profiles = listProfiles();
+    if (!profiles.length) {
+      console.log(c.dim('No profiles to regenerate. Use "vip add" to create one.'));
+      return;
+    }
+
+    if (opts.dryRun) {
+      console.log(c.cyan('Dry run — would regenerate:\n'));
+      profiles.forEach((p, i) => {
+        console.log(`  [${i + 1}/${profiles.length}] ${p.name}`);
+      });
+      console.log(`\n${profiles.length} profile(s) would be regenerated.`);
+      return;
+    }
+
+    console.log(c.cyan('Regenerating all profiles with current template...'));
+    let count = 0;
+
+    for (let i = 0; i < profiles.length; i++) {
+      const p = profiles[i];
+      const prefix = `  [${i + 1}/${profiles.length}] ${p.name}`;
+      const stop = spinner(`${prefix}...`);
+
+      try {
+        const content = loadProfile(p.slug);
+        if (!content) {
+          stop();
+          console.log(`${prefix}... ${c.yellow('skipped (not found)')}`);
+          continue;
+        }
+
+        const { extractMetadata } = await import('../lib/monitor.js');
+        const meta = extractMetadata(content);
+        const personName = meta.name || p.name;
+
+        const person = resolveFromName(personName);
+        if (meta.twitterHandle) person.twitterHandle = person.twitterHandle || meta.twitterHandle;
+        if (meta.linkedinUrl) person.linkedinUrl = person.linkedinUrl || meta.linkedinUrl;
+
+        const [rawData, sources] = gatherData(person);
+        if (!rawData.trim()) {
+          stop();
+          console.log(`${prefix}... ${c.yellow('skipped (no data)')}`);
+          continue;
+        }
+
+        let profile;
+        if (opts.ai === false) {
+          profile = `# ${personName}\n\n## Raw Data\n\n${rawData}`;
+        } else {
+          profile = await synthesizeProfile(rawData, sources);
+        }
+
+        saveProfile(personName, profile);
+        stop();
+        console.log(`${prefix}... ${c.green('done')}`);
+
+        appendChangelog({
+          timestamp: new Date().toISOString(),
+          name: personName,
+          slug: p.slug,
+          type: 'updated',
+          summary: `Profile regenerated with current template`,
+        });
+
+        count++;
+      } catch (e) {
+        stop();
+        console.log(`${prefix}... ${c.red(`error: ${e.message}`)}`);
+      }
+    }
+
+    console.log(`\n${count} profile(s) regenerated.`);
+  });
+
 program.parseAsync();

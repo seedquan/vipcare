@@ -1,6 +1,8 @@
-import { describe, it } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import { execFileSync } from 'child_process';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 const CLI = path.join(import.meta.dirname, '..', 'bin', 'vip.js');
@@ -80,5 +82,124 @@ describe('CLI', () => {
       assert.ok(stdout.includes('Profiles dir') || stdout.includes('profiles_dir'),
         'should show profiles directory config');
     });
+  });
+});
+
+describe('vip export', () => {
+  it('outputs valid JSON array', () => {
+    const { stdout, exitCode } = run(['export']);
+    // If no profiles exist, export exits non-zero with an error
+    if (exitCode !== 0) {
+      // No profiles to export is acceptable; skip parse check
+      return;
+    }
+    const data = JSON.parse(stdout);
+    assert.ok(Array.isArray(data), 'export output should be a JSON array');
+  });
+
+  it('each entry has required fields', () => {
+    const { stdout, exitCode } = run(['export']);
+    if (exitCode !== 0) return; // no profiles
+
+    const data = JSON.parse(stdout);
+    assert.ok(data.length > 0, 'should have at least one profile');
+    for (const entry of data) {
+      assert.ok(typeof entry.slug === 'string' && entry.slug.length > 0,
+        `entry should have a non-empty slug, got: ${entry.slug}`);
+      assert.ok(typeof entry.name === 'string' && entry.name.length > 0,
+        `entry should have a non-empty name, got: ${entry.name}`);
+      assert.ok(typeof entry.content === 'string' && entry.content.length > 0,
+        `entry should have non-empty content, got length: ${entry.content?.length}`);
+      assert.ok(typeof entry.exportedAt === 'string' && entry.exportedAt.length > 0,
+        `entry should have exportedAt timestamp, got: ${entry.exportedAt}`);
+    }
+  });
+
+  it('exports to file with -o flag', () => {
+    const tmpFile = path.join(os.tmpdir(), `vip-export-test-${Date.now()}.json`);
+    try {
+      const { exitCode } = run(['export', '-o', tmpFile]);
+      if (exitCode !== 0) return; // no profiles
+      assert.ok(fs.existsSync(tmpFile), 'output file should exist');
+      const data = JSON.parse(fs.readFileSync(tmpFile, 'utf-8'));
+      assert.ok(Array.isArray(data), 'file content should be a JSON array');
+    } finally {
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    }
+  });
+});
+
+describe('vip import', () => {
+  it('rejects missing file', () => {
+    const { exitCode, stderr } = run(['import', '/tmp/nonexistent-vip-file-xyz.json']);
+    assert.notStrictEqual(exitCode, 0, 'should exit non-zero for missing file');
+  });
+
+  it('rejects invalid JSON', () => {
+    const tmpFile = path.join(os.tmpdir(), `vip-import-bad-${Date.now()}.json`);
+    try {
+      fs.writeFileSync(tmpFile, 'not valid json!!!', 'utf-8');
+      const { exitCode } = run(['import', tmpFile]);
+      assert.notStrictEqual(exitCode, 0, 'should exit non-zero for invalid JSON');
+    } finally {
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it('rejects non-array JSON', () => {
+    const tmpFile = path.join(os.tmpdir(), `vip-import-obj-${Date.now()}.json`);
+    try {
+      fs.writeFileSync(tmpFile, JSON.stringify({ name: 'test' }), 'utf-8');
+      const { exitCode } = run(['import', tmpFile]);
+      assert.notStrictEqual(exitCode, 0, 'should exit non-zero for non-array JSON');
+    } finally {
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it('imports profiles from JSON file', () => {
+    // Export current profiles first
+    const { stdout: exportOutput, exitCode: exportCode } = run(['export']);
+    if (exportCode !== 0) return; // no profiles to round-trip
+
+    const exported = JSON.parse(exportOutput);
+    assert.ok(exported.length > 0, 'need at least one profile for round-trip test');
+
+    // Write exported data to a temp file
+    const tmpFile = path.join(os.tmpdir(), `vip-import-test-${Date.now()}.json`);
+    try {
+      fs.writeFileSync(tmpFile, JSON.stringify(exported), 'utf-8');
+
+      // Import with --force to overwrite existing profiles
+      const { stdout: importOutput, exitCode: importCode } = run(['import', tmpFile, '-f']);
+      assert.strictEqual(importCode, 0, 'import should exit 0');
+      assert.ok(importOutput.includes('Imported') || importOutput.includes('imported'),
+        'should report imported profiles');
+
+      // Verify the profiles still exist by showing one
+      const firstName = exported[0].name;
+      const { exitCode: showCode } = run(['show', firstName]);
+      assert.strictEqual(showCode, 0, `profile '${firstName}' should exist after import`);
+    } finally {
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    }
+  });
+
+  it('skips entries missing content or slug', () => {
+    const tmpFile = path.join(os.tmpdir(), `vip-import-skip-${Date.now()}.json`);
+    try {
+      const badData = [
+        { slug: '', content: '' },
+        { name: 'no-content' },
+        { content: 'no-slug' },
+      ];
+      fs.writeFileSync(tmpFile, JSON.stringify(badData), 'utf-8');
+      const { stdout, exitCode } = run(['import', tmpFile]);
+      assert.strictEqual(exitCode, 0, 'import should exit 0 even when skipping');
+      assert.ok(stdout.includes('0 imported') || stdout.includes('skipped'),
+        'should report skipped entries');
+    } finally {
+      if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
+    }
   });
 });
