@@ -861,18 +861,31 @@ program.command('config')
   .option('--json', 'Output as JSON')
   .action((opts) => {
     const cfg = loadConfig();
+
+    const toolStatus = {
+      bird: checkTool('bird'),
+      ddgs: (() => { try { execFileSync('python3', ['-c', 'import ddgs'], { stdio: 'ignore', timeout: 5000 }); return true; } catch { return checkTool('ddgs'); } })(),
+      claude: checkTool('claude'),
+      'yt-dlp': checkTool('yt-dlp'),
+      whisper: (() => { try { execFileSync('python3', ['-c', 'import whisper'], { stdio: 'ignore', timeout: 5000 }); return true; } catch { return checkTool('whisper'); } })(),
+      ai_backend: getBackendName(),
+    };
+
     if (opts.json) {
-      console.log(JSON.stringify({
-        ...cfg,
-        tools: { bird: checkTool('bird'), ai_backend: getBackendName() }
-      }, null, 2));
+      console.log(JSON.stringify({ ...cfg, tools: toolStatus }, null, 2));
       return;
     }
     console.log(c.bold(c.cyan('Current config:')));
     console.log(`  Profiles dir: ${cfg.profiles_dir}`);
     console.log(`  Monitor interval: ${cfg.monitor_interval_hours}h`);
-    console.log(`  Bird CLI: ${checkTool('bird') ? c.green('available') : c.red('not found')}`);
-    console.log(`  AI backend: ${(() => { const b = getBackendName(); return b !== 'none' ? c.green(b) : c.red('not found'); })()}`);
+    console.log();
+    const ok = (v) => v ? c.green('available') : c.red('not found');
+    console.log(`  Bird CLI:       ${ok(toolStatus.bird)}`);
+    console.log(`  DDGS:           ${ok(toolStatus.ddgs)}`);
+    console.log(`  Claude CLI:     ${ok(toolStatus.claude)}`);
+    console.log(`  yt-dlp:         ${ok(toolStatus['yt-dlp'])}`);
+    console.log(`  Whisper:        ${ok(toolStatus.whisper)}`);
+    console.log(`  AI backend:     ${toolStatus.ai_backend !== 'none' ? c.green(toolStatus.ai_backend) : c.red('not found')}`);
   });
 
 // --- init ---
