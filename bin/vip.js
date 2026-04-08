@@ -12,6 +12,8 @@ import { searchPerson } from '../lib/fetchers/search.js';
 import { synthesizeProfile, getBackendName } from '../lib/synthesizer.js';
 import { readChangelog, runMonitor, unreadCount } from '../lib/monitor.js';
 import { install, uninstall, status } from '../lib/scheduler.js';
+import * as youtube from '../lib/fetchers/youtube.js';
+import { generateCards } from '../lib/card.js';
 
 // Colors
 const c = {
@@ -83,6 +85,7 @@ program.command('add')
   .option('--dry-run', 'Print without saving')
   .option('--no-ai', 'Skip AI synthesis')
   .option('-f, --force', 'Overwrite existing')
+  .option('-y, --youtube <urls...>', 'YouTube video URLs to transcribe')
   .action(async (query, opts) => {
     console.log(c.cyan(`Resolving ${query}...`));
 
@@ -120,7 +123,29 @@ program.command('add')
     }
 
     console.log(c.cyan('Gathering data...'));
-    const [rawData, sources] = gatherData(person);
+    let [rawData, sources] = gatherData(person);
+
+    // YouTube transcription
+    if (opts.youtube?.length) {
+      if (!youtube.isAvailable()) {
+        console.log(c.yellow('YouTube transcriber not available. Skipping videos.'));
+      } else {
+        for (const ytUrl of opts.youtube) {
+          const stop = spinner(`Transcribing video: ${ytUrl}...`);
+          try {
+            const yt = youtube.transcribeVideo(ytUrl);
+            stop();
+            console.log(c.green(`  Transcribed: ${yt.title}`));
+            rawData += `\n\n=== YouTube Video: ${yt.title} (${yt.url}) ===\n${yt.transcript}`;
+            sources.push(yt.url);
+          } catch (e) {
+            stop();
+            console.log(c.yellow(`  Failed: ${e.message}`));
+          }
+        }
+      }
+    }
+
     if (!rawData.trim()) { console.error(c.red('No data found.')); process.exit(1); }
 
     let profile;
@@ -292,6 +317,75 @@ program.command('edit')
 
     if (modified) { saveProfile(name, content); console.log(c.green('Profile updated.')); }
     else console.log(c.yellow('No changes. Use --title, --company, --twitter, --linkedin, or --note.'));
+  });
+
+// --- youtube ---
+program.command('youtube')
+  .description('Add YouTube video transcript to existing profile')
+  .argument('<name>', 'Profile name')
+  .argument('<url>', 'YouTube video URL')
+  .action(async (name, url) => {
+    const content = loadProfile(name);
+    if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
+
+    if (!youtube.isAvailable()) {
+      console.error(c.red('YouTube transcriber not available.'));
+      process.exit(1);
+    }
+
+    const stop = spinner(`Transcribing: ${url}...`);
+    let yt;
+    try { yt = youtube.transcribeVideo(url); } finally { stop(); }
+    console.log(c.green(`  Transcribed: ${yt.title}`));
+
+    const { extractMetadata } = await import('../lib/monitor.js');
+    const meta = extractMetadata(content);
+
+    // Combine existing profile data with new transcript
+    const rawData = content + `\n\n=== YouTube Video: ${yt.title} (${yt.url}) ===\n${yt.transcript}`;
+    const sources = [yt.url];
+
+    const stop2 = spinner('Re-synthesizing profile...');
+    let profile;
+    try { profile = await synthesizeProfile(rawData, sources); } finally { stop2(); }
+
+    const filepath = saveProfile(meta.name || name, profile);
+    console.log(c.green(`Profile updated: ${filepath}`));
+  });
+
+// --- youtube-search ---
+program.command('youtube-search')
+  .description('Find YouTube videos for a person')
+  .argument('<name>', 'Person name')
+  .option('-n, --count <n>', 'Max results', '5')
+  .action((name, opts) => {
+    console.log(c.cyan(`Searching YouTube for ${name}...`));
+    const results = youtube.searchYouTubeVideos(name, parseInt(opts.count));
+
+    if (!results.length) { console.log(c.dim('No YouTube videos found.')); return; }
+
+    console.log(c.green(`Found ${results.length} video(s):\n`));
+    results.forEach((r, i) => {
+      console.log(`  ${c.bold(c.cyan(`${i + 1}.`))} ${r.title}`);
+      console.log(c.dim(`     ${r.url}`));
+      if (r.body) console.log(c.dim(`     ${r.body.slice(0, 100)}`));
+      console.log();
+    });
+    console.log(c.dim('Use: vip youtube <name> <url> to transcribe and add to profile'));
+  });
+
+// --- card ---
+program.command('card')
+  .description('Generate H5 baseball card page from all profiles')
+  .option('-o, --output <path>', 'Output HTML file', 'web/index.html')
+  .action((opts) => {
+    console.log(c.cyan('Generating baseball cards...'));
+    const profiles = listProfiles();
+    if (!profiles.length) { console.log(c.dim('No profiles. Use "vip add" first.')); return; }
+
+    const outputPath = generateCards(profiles, opts.output);
+    console.log(c.green(`Cards generated: ${outputPath}`));
+    console.log(c.dim(`Open in browser: open ${outputPath}`));
   });
 
 // --- digest ---
