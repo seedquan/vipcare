@@ -71,6 +71,9 @@ function gatherData(person) {
     rawParts.push('=== Web Search Results ===');
     person.rawSnippets.forEach((snippet, i) => {
       if (!snippet.trim()) return; // skip empty
+      if (snippet.trim().length < 30) return; // too short to be useful
+      const lines = snippet.trim().split('\n');
+      if (lines.length >= 2 && lines[0].trim() === lines[1].trim()) return; // title == body
       rawParts.push(snippet);
       const url = person.otherUrls?.[i] || '';
       if (url) searchEntries.push({ url, snippet });
@@ -82,9 +85,13 @@ function gatherData(person) {
     const results = searchPerson(person.name);
     for (const r of results) {
       if (!r.body?.trim() && !r.title?.trim()) continue; // skip empty
-      rawParts.push(`${r.title}\n${r.body}`);
+      const snippet = `${r.title}\n${r.body}`;
+      if (snippet.trim().length < 30) continue; // too short to be useful
+      if (r.title?.trim() === r.body?.trim()) continue; // title == body (junk category)
+      if (!r.body?.trim() || r.body.trim().length < 20) continue; // no real body content
+      rawParts.push(snippet);
       if (!sources.includes(r.url)) sources.push(r.url);
-      searchEntries.push({ url: r.url, snippet: `${r.title}\n${r.body}` });
+      searchEntries.push({ url: r.url, snippet });
     }
   }
 
@@ -508,6 +515,7 @@ program.command('youtube-search')
 
 // --- card ---
 program.command('card')
+  .alias('open-cards')
   .description('Generate and serve H5 baseball card page')
   .option('-o, --output <path>', 'Output HTML file', path.join(os.homedir(), '.vip', 'cards', 'index.html'))
   .option('-p, --port <port>', 'Server port', '3000')
