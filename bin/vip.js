@@ -830,6 +830,48 @@ program.command('init')
       const { CONFIG_FILE: cfgPath } = await import('../lib/config.js');
       console.log(c.green(`\nConfig saved to ${cfgPath}`));
 
+      // --- Check & install dependencies ---
+      console.log(c.bold(c.cyan('\nChecking dependencies...\n')));
+
+      const deps = [
+        { name: 'bird', label: 'Bird CLI (Twitter data)', install: 'npm install -g @nickytonline/bird', check: () => checkTool('bird') },
+        { name: 'ddgs', label: 'DDGS (web search)', install: 'pip install ddgs', check: () => checkTool('ddgs') || fs.existsSync(path.join(os.homedir(), 'Library', 'Python', '3.9', 'bin', 'ddgs')) },
+        { name: 'claude', label: 'Claude Code CLI (AI synthesis)', install: 'npm install -g @anthropic-ai/claude-code', check: () => checkTool('claude') },
+        { name: 'yt-dlp', label: 'yt-dlp (YouTube download)', install: 'pip install yt-dlp', check: () => checkTool('yt-dlp') },
+        { name: 'whisper', label: 'Whisper (YouTube transcription)', install: 'pip install openai-whisper', check: () => checkTool('whisper') },
+      ];
+
+      const missing = [];
+      for (const dep of deps) {
+        const ok = dep.check();
+        console.log(`  ${ok ? c.green('✓') : c.red('✗')} ${dep.label}`);
+        if (!ok) missing.push(dep);
+      }
+
+      if (missing.length > 0) {
+        console.log(`\n${c.yellow(`${missing.length} optional dependency(ies) not found.`)}`);
+        const installAnswer = await rl.question('  Install missing dependencies? (Y/n) > ');
+        if (!installAnswer.trim() || installAnswer.trim().toLowerCase().startsWith('y')) {
+          for (const dep of missing) {
+            console.log(c.dim(`  Installing ${dep.name}...`));
+            try {
+              const [cmd, ...args] = dep.install.split(' ');
+              execFileSync(cmd, args, { stdio: 'inherit', timeout: 120000 });
+              console.log(c.green(`  ✓ ${dep.name} installed`));
+            } catch {
+              console.log(c.yellow(`  ✗ Failed to install ${dep.name}. Install manually: ${dep.install}`));
+            }
+          }
+        } else {
+          console.log(c.dim('  Skipped. Install later with:'));
+          for (const dep of missing) {
+            console.log(c.dim(`    ${dep.install}`));
+          }
+        }
+      } else {
+        console.log(c.green('\n  All dependencies available!'));
+      }
+
       // Install Claude Code skill by default
       const skillSrc = new URL('../skill/vip.md', import.meta.url);
       const skillDest = path.join(os.homedir(), '.claude', 'commands', 'vip.md');
