@@ -474,16 +474,44 @@ program.command('youtube-search')
 
 // --- card ---
 program.command('card')
-  .description('Generate H5 baseball card page from all profiles')
+  .description('Generate and serve H5 baseball card page')
   .option('-o, --output <path>', 'Output HTML file', 'web/index.html')
-  .action((opts) => {
+  .option('-p, --port <port>', 'Server port', '3000')
+  .option('--no-serve', 'Only generate, do not start server')
+  .action(async (opts) => {
     console.log(c.cyan('Generating baseball cards...'));
     const profiles = listProfiles();
     if (!profiles.length) { console.log(c.dim('No profiles. Use "vip add" first.')); return; }
 
     const outputPath = generateCards(profiles, opts.output);
     console.log(c.green(`Cards generated: ${outputPath}`));
-    console.log(c.dim(`Open in browser: open ${outputPath}`));
+
+    if (opts.serve === false) {
+      console.log(c.dim(`Open in browser: open ${outputPath}`));
+      return;
+    }
+
+    const http = await import('http');
+    const port = parseInt(opts.port);
+    const dir = path.dirname(outputPath);
+    const file = path.basename(outputPath);
+
+    const server = http.createServer((req, res) => {
+      const filePath = req.url === '/' ? path.join(dir, file) : path.join(dir, req.url);
+      if (!fs.existsSync(filePath)) { res.writeHead(404); res.end('Not found'); return; }
+      const ext = path.extname(filePath);
+      const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png' };
+      res.writeHead(200, { 'Content-Type': types[ext] || 'text/plain' });
+      res.end(fs.readFileSync(filePath));
+    });
+
+    server.listen(port, () => {
+      const url = `http://localhost:${port}`;
+      console.log(c.green(`\nServer running at ${c.bold(url)}`));
+      console.log(c.dim('Press Ctrl+C to stop\n'));
+      // Auto-open in browser
+      try { execFileSync('open', [url], { stdio: 'ignore' }); } catch {}
+    });
   });
 
 // --- digest ---
