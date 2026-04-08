@@ -7,7 +7,7 @@
     "vip": "bin/vip.js"
   },
   "scripts": {
-    "test": "node --test tests/*.test.js"
+    "test": "node --experimental-test-module-mocks --test tests/*.test.js"
   },
   "keywords": [
     "crm",
