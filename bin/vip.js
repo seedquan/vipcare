@@ -5,12 +5,12 @@ import fs from 'fs';
 import os from 'os';
 import { execFileSync } from 'child_process';
 import { checkTool, getProfilesDir, loadConfig, saveConfig } from '../lib/config.js';
-import { deleteProfile, getProfilePath, listProfiles, loadProfile, profileExists, saveProfile, searchProfiles } from '../lib/profile.js';
+import { deleteProfile, getProfilePath, listProfiles, loadProfile, profileExists, saveProfile, searchProfiles, slugify } from '../lib/profile.js';
 import { isUrl, resolveFromName, resolveFromUrl } from '../lib/resolver.js';
 import * as twitter from '../lib/fetchers/twitter.js';
 import { searchPerson } from '../lib/fetchers/search.js';
 import { synthesizeProfile, getBackendName } from '../lib/synthesizer.js';
-import { readChangelog, runMonitor, unreadCount } from '../lib/monitor.js';
+import { appendChangelog, readChangelog, runMonitor, unreadCount } from '../lib/monitor.js';
 import { install, uninstall, status } from '../lib/scheduler.js';
 import * as youtube from '../lib/fetchers/youtube.js';
 import { generateCards, extractVipData } from '../lib/card.js';
@@ -75,7 +75,7 @@ try {
 } catch {}
 
 const program = new Command();
-program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.1.0');
+program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.2.0');
 
 // --- add ---
 program.command('add')
@@ -164,14 +164,27 @@ program.command('add')
     } else {
       const filepath = saveProfile(person.name, profile);
       console.log(c.green(`\nProfile saved: ${filepath}`));
+      appendChangelog({
+        timestamp: new Date().toISOString(),
+        name: person.name,
+        slug: slugify(person.name),
+        type: 'created',
+        summary: `Profile created for ${person.name}`,
+      });
     }
   });
 
 // --- list ---
 program.command('list')
   .description('List all VIP profiles')
-  .action(() => {
+  .option('--json', 'Output as JSON')
+  .action((opts) => {
     const profiles = listProfiles();
+    if (opts.json) {
+      const data = profiles.map(p => ({ slug: p.slug, name: p.name, summary: p.summary, updated: p.updated, path: p.path }));
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
     if (!profiles.length) { console.log(c.dim('No profiles yet. Use "vip add" to create one.')); return; }
 
     const cols = process.stdout.columns || 80;
@@ -193,9 +206,20 @@ program.command('list')
 program.command('show')
   .description('Show a VIP profile')
   .argument('<name>')
-  .action((name) => {
+  .option('--json', 'Output as JSON')
+  .action((name, opts) => {
     const content = loadProfile(name);
     if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
+
+    if (opts.json) {
+      const slug = slugify(name);
+      const nameMatch = content.match(/^# (.+)$/m);
+      const profileName = nameMatch ? nameMatch[1] : name;
+      const vipData = extractVipData(content);
+      const data = { slug, name: profileName, content, vipData: vipData || null };
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
 
     for (const line of content.split('\n')) {
       if (line.startsWith('# ')) console.log(c.bold(c.cyan(line)));
@@ -210,8 +234,14 @@ program.command('show')
 program.command('search')
   .description('Search across all profiles')
   .argument('<keyword>')
-  .action((keyword) => {
+  .option('--json', 'Output as JSON')
+  .action((keyword, opts) => {
     const results = searchProfiles(keyword);
+    if (opts.json) {
+      const data = results.map(r => ({ slug: r.slug, name: r.name, matches: r.matches }));
+      console.log(JSON.stringify(data, null, 2));
+      return;
+    }
     if (!results.length) { console.log(c.dim(`No matches for '${keyword}'.`)); return; }
 
     console.log(c.green(`Found ${results.length} profile(s) matching '${keyword}':\n`));
@@ -436,7 +466,8 @@ program.command('digest')
 
     console.log(c.bold(c.cyan('Changes in the last 30 days:\n')));
     for (const e of entries.reverse()) {
-      console.log(c.green(`  [${(e.timestamp || '').slice(0, 10)}] ${e.name}`));
+      const label = e.type === 'created' ? c.cyan('[created]') : c.green('[updated]');
+      console.log(`  ${label} [${(e.timestamp || '').slice(0, 10)}] ${e.name}`);
       console.log(`    ${e.summary}`);
       console.log();
     }
