@@ -1,8 +1,16 @@
 import { describe, it, before, beforeEach, mock } from 'node:test';
 import assert from 'node:assert';
+import _realFs from 'fs';
 
-// Set up the mock once at module level, before any imports of search.js
+// Save original fs functions before mocking
+const originalExistsSync = _realFs.existsSync.bind(_realFs);
+const originalReadFileSync = _realFs.readFileSync.bind(_realFs);
+const originalWriteFileSync = _realFs.writeFileSync.bind(_realFs);
+const originalMkdirSync = _realFs.mkdirSync.bind(_realFs);
+
+// Set up mocks at module level, before any imports of search.js
 const execFileSyncMock = mock.fn(() => { throw new Error('not found'); });
+const existsSyncMock = mock.fn((...args) => originalExistsSync(...args));
 
 mock.module('child_process', {
   namedExports: {
@@ -10,7 +18,16 @@ mock.module('child_process', {
   },
 });
 
-// Now import the modules that depend on child_process
+mock.module('fs', {
+  defaultExport: {
+    existsSync: (...args) => existsSyncMock(...args),
+    readFileSync: (...args) => originalReadFileSync(...args),
+    writeFileSync: (...args) => originalWriteFileSync(...args),
+    mkdirSync: (...args) => originalMkdirSync(...args),
+  },
+});
+
+// Now import the modules that depend on child_process and fs
 const { search, searchPerson } = await import('../lib/fetchers/search.js');
 
 describe('search', () => {
@@ -18,6 +35,9 @@ describe('search', () => {
     // Reset mock to default (throw) before each test
     execFileSyncMock.mock.resetCalls();
     execFileSyncMock.mock.mockImplementation(() => { throw new Error('not found'); });
+    // Restore original existsSync before each test
+    existsSyncMock.mock.resetCalls();
+    existsSyncMock.mock.mockImplementation((...args) => originalExistsSync(...args));
   });
 
   describe('search()', () => {
@@ -60,12 +80,22 @@ describe('search', () => {
     });
 
     it('falls back to curl when ddgs not available', () => {
+      // Ensure findDdgs() returns null: mock both `which ddgs` and fs.existsSync for ddgs paths
+      existsSyncMock.mock.mockImplementation((p) => {
+        if (typeof p === 'string' && p.includes('ddgs')) return false;
+        return originalExistsSync(p);
+      });
+
       execFileSyncMock.mock.mockImplementation((cmd, args, opts) => {
         if (cmd === 'which' && args[0] === 'ddgs') throw new Error('not found');
         if (cmd === 'which') return '/usr/bin/' + args[0];
         if (cmd === 'curl') {
-          return '<a href="https://example.com" class="result-link">Example</a>' +
-                 '<td class="result-snippet">A snippet</td>';
+          // DDG Instant Answer API returns JSON with an abstract result
+          return JSON.stringify({
+            Heading: 'Example',
+            Abstract: 'A snippet',
+            AbstractURL: 'https://example.com',
+          });
         }
         throw new Error('not found');
       });

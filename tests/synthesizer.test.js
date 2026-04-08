@@ -3,10 +3,12 @@ import assert from 'node:assert';
 
 // Set up the mock once at module level before importing synthesizer
 const execFileSyncMock = mock.fn(() => { throw new Error('not found'); });
+const spawnSyncMock = mock.fn(() => ({ status: 1, stdout: '', stderr: '', error: new Error('not found') }));
 
 mock.module('child_process', {
   namedExports: {
     execFileSync: execFileSyncMock,
+    spawnSync: spawnSyncMock,
   },
 });
 
@@ -19,6 +21,8 @@ describe('synthesizer', () => {
     savedEnv = { ...process.env };
     execFileSyncMock.mock.resetCalls();
     execFileSyncMock.mock.mockImplementation(() => { throw new Error('not found'); });
+    spawnSyncMock.mock.resetCalls();
+    spawnSyncMock.mock.mockImplementation(() => ({ status: 1, stdout: '', stderr: '', error: new Error('not found') }));
   });
 
   afterEach(() => {
@@ -100,10 +104,9 @@ describe('synthesizer', () => {
     it('appends footer with date and sources', async () => {
       process.env.VIP_AI_BACKEND = 'claude-cli';
 
-      execFileSyncMock.mock.mockImplementation((cmd, args, opts) => {
-        if (cmd === 'claude') return '# Test Person\n\n> A test profile';
-        if (cmd === 'which') return '/usr/local/bin/' + args[0];
-        throw new Error('not found');
+      spawnSyncMock.mock.mockImplementation((cmd, args, opts) => {
+        if (cmd === 'claude') return { status: 0, stdout: '# Test Person\n\n> A test profile', stderr: '' };
+        return { status: 1, stdout: '', stderr: '', error: new Error('not found') };
       });
 
       const result = await synthesizeProfile('raw data here', ['https://example.com', 'https://twitter.com/test']);
@@ -117,10 +120,9 @@ describe('synthesizer', () => {
     it('without sources omits Sources line', async () => {
       process.env.VIP_AI_BACKEND = 'claude-cli';
 
-      execFileSyncMock.mock.mockImplementation((cmd, args, opts) => {
-        if (cmd === 'claude') return '# Test Person\n\n> A test profile';
-        if (cmd === 'which') return '/usr/local/bin/' + args[0];
-        throw new Error('not found');
+      spawnSyncMock.mock.mockImplementation((cmd, args, opts) => {
+        if (cmd === 'claude') return { status: 0, stdout: '# Test Person\n\n> A test profile', stderr: '' };
+        return { status: 1, stdout: '', stderr: '', error: new Error('not found') };
       });
 
       const result = await synthesizeProfile('raw data here', []);
@@ -133,10 +135,9 @@ describe('synthesizer', () => {
     it('without sources param omits Sources line', async () => {
       process.env.VIP_AI_BACKEND = 'claude-cli';
 
-      execFileSyncMock.mock.mockImplementation((cmd, args, opts) => {
-        if (cmd === 'claude') return '# No Sources Person';
-        if (cmd === 'which') return '/usr/local/bin/' + args[0];
-        throw new Error('not found');
+      spawnSyncMock.mock.mockImplementation((cmd, args, opts) => {
+        if (cmd === 'claude') return { status: 0, stdout: '# No Sources Person', stderr: '' };
+        return { status: 1, stdout: '', stderr: '', error: new Error('not found') };
       });
 
       const result = await synthesizeProfile('raw data', undefined);
@@ -148,10 +149,9 @@ describe('synthesizer', () => {
     it('returns null for NO_SIGNIFICANT_CHANGES', async () => {
       process.env.VIP_AI_BACKEND = 'claude-cli';
 
-      execFileSyncMock.mock.mockImplementation((cmd, args, opts) => {
-        if (cmd === 'claude') return 'NO_SIGNIFICANT_CHANGES';
-        if (cmd === 'which') return '/usr/local/bin/' + args[0];
-        throw new Error('not found');
+      spawnSyncMock.mock.mockImplementation((cmd, args, opts) => {
+        if (cmd === 'claude') return { status: 0, stdout: 'NO_SIGNIFICANT_CHANGES', stderr: '' };
+        return { status: 1, stdout: '', stderr: '', error: new Error('not found') };
       });
 
       const result = await detectChanges('old profile content', 'new data content');
@@ -161,10 +161,9 @@ describe('synthesizer', () => {
     it('returns summary string for real changes', async () => {
       process.env.VIP_AI_BACKEND = 'claude-cli';
 
-      execFileSyncMock.mock.mockImplementation((cmd, args, opts) => {
-        if (cmd === 'claude') return 'Changed job title from CTO to CEO. New company announced.';
-        if (cmd === 'which') return '/usr/local/bin/' + args[0];
-        throw new Error('not found');
+      spawnSyncMock.mock.mockImplementation((cmd, args, opts) => {
+        if (cmd === 'claude') return { status: 0, stdout: 'Changed job title from CTO to CEO. New company announced.', stderr: '' };
+        return { status: 1, stdout: '', stderr: '', error: new Error('not found') };
       });
 
       const result = await detectChanges('old profile', 'new data');

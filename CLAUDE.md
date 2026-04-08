@@ -26,7 +26,6 @@ lib/
   templates.js          — Profile templates
 tests/                  — One test file per module
 profiles/               — Generated profile Markdown files
-web/                    — Card HTML output
 skill/                  — Claude Code slash command
 ```
 
