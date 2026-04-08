@@ -76,7 +76,8 @@ try {
 } catch {}
 
 const program = new Command();
-program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.3.2');
+const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
+program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version(pkg.version, '-v, --version');
 
 // --- add ---
 program.command('add')
