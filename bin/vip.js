@@ -76,7 +76,7 @@ try {
 } catch {}
 
 const program = new Command();
-program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.3.1');
+program.name('vip').description('VIP Profile Builder - Auto-build VIP person profiles from public data').version('0.3.2');
 
 // --- add ---
 program.command('add')
