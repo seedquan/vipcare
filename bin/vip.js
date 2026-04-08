@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import fs from 'fs';
 import os from 'os';
+import path from 'path';
 import readline from 'readline/promises';
 import { execFileSync } from 'child_process';
 import { checkTool, getProfilesDir, loadConfig, saveConfig } from '../lib/config.js';
