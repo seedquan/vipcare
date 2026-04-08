@@ -1,6 +1,5 @@
 tests/
 .harness/
 profiles/
-skill/
 .gitignore
 .git/
