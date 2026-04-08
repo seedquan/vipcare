@@ -36,9 +36,19 @@ function spinner(msg) {
   return () => { clearInterval(id); process.stdout.write(`\r${' '.repeat(msg.length + 4)}\r`); };
 }
 
+function saveRawSource(personSlug, sourceName, content) {
+  const rawDir = path.join(getProfilesDir(), '.raw', personSlug);
+  fs.mkdirSync(rawDir, { recursive: true });
+  const safeName = sourceName.replace(/[^\w.-]/g, '_').substring(0, 80);
+  const filePath = path.join(rawDir, `${safeName}.md`);
+  fs.writeFileSync(filePath, content, 'utf-8');
+  return filePath;
+}
+
 function gatherData(person) {
   const rawParts = [];
   const sources = [];
+  const personSlug = slugify(person.name || 'unknown');
 
   if (person.twitterHandle) {
     console.log(c.dim(`  Fetching Twitter @${person.twitterHandle}...`));
@@ -46,6 +56,7 @@ function gatherData(person) {
     if (data?.rawOutput) {
       rawParts.push(`=== Twitter (@${person.twitterHandle}) ===\n${data.rawOutput}`);
       sources.push(`https://twitter.com/${person.twitterHandle}`);
+      saveRawSource(personSlug, `twitter_${person.twitterHandle}`, `# Twitter @${person.twitterHandle}\n\nSource: https://twitter.com/${person.twitterHandle}\nFetched: ${new Date().toISOString()}\n\n${data.rawOutput}`);
     } else if (!twitter.isAvailable()) {
       console.log(c.yellow('  (bird CLI not found, skipping Twitter)'));
     }
@@ -56,6 +67,12 @@ function gatherData(person) {
   if (person.rawSnippets.length) {
     rawParts.push('=== Web Search Results ===');
     rawParts.push(...person.rawSnippets);
+    // Save each snippet as a raw source file
+    person.rawSnippets.forEach((snippet, i) => {
+      const url = person.otherUrls?.[i] || `search_result_${i}`;
+      const safeName = url.replace(/https?:\/\//, '').replace(/[^\w.-]/g, '_').substring(0, 60);
+      saveRawSource(personSlug, safeName, `# Search Result\n\nSource: ${url}\nFetched: ${new Date().toISOString()}\n\n${snippet}`);
+    });
   }
 
   if (rawParts.length < 2 && person.name) {
@@ -64,9 +81,12 @@ function gatherData(person) {
     for (const r of results) {
       rawParts.push(`${r.title}\n${r.body}`);
       if (!sources.includes(r.url)) sources.push(r.url);
+      const safeName = r.url.replace(/https?:\/\//, '').replace(/[^\w.-]/g, '_').substring(0, 60);
+      saveRawSource(personSlug, safeName, `# ${r.title}\n\nSource: ${r.url}\nFetched: ${new Date().toISOString()}\n\n${r.body}`);
     }
   }
 
+  console.log(c.dim(`  Raw data saved to ${path.join(getProfilesDir(), '.raw', personSlug)}/`));
   return [rawParts.join('\n\n'), sources];
 }
 
@@ -83,13 +103,14 @@ program.name('vip').description('VIP Profile Builder - Auto-build VIP person pro
 // --- add ---
 program.command('add')
   .description('Add a new VIP profile')
-  .argument('<query>', 'Name or URL')
+  .argument('<query...>', 'Name (multiple words) or URL')
   .option('-c, --company <company>', 'Company name')
   .option('--dry-run', 'Print without saving')
   .option('--no-ai', 'Skip AI synthesis')
   .option('-f, --force', 'Overwrite existing')
   .option('-y, --youtube <urls...>', 'YouTube video URLs to transcribe')
-  .action(async (query, opts) => {
+  .action(async (queryParts, opts) => {
+    const query = queryParts.join(' ');
     console.log(c.cyan(`Resolving ${query}...`));
 
     let person;
