@@ -57,6 +57,28 @@ Auto-detected in this order:
 
 Override with `VIP_AI_BACKEND=anthropic` or set `ai_backend` in config.
 
+## Claude Code Skill
+
+VIPCare includes a `/vip` slash command for Claude Code. Install the skill:
+
+```bash
+cp skill/vip.md ~/.claude/commands/vip.md
+```
+
+Then use natural language in Claude Code:
+
+```
+/vip add Jensen Huang from NVIDIA
+/vip list
+/vip show sam
+/vip who works in AI?
+/vip compare Sam Altman and Elon Musk
+/vip add a note to sam: met at dinner last week
+/vip add these people: Tim Cook, Sundar Pichai, Satya Nadella
+```
+
+The skill combines the `vip` CLI (data fetching) with Claude's intelligence (synthesis, analysis, comparison).
+
 ## Monitoring
 
 ```bash
