@@ -2,19 +2,16 @@
 
 Auto-build VIP person profiles from Twitter/LinkedIn public data.
 
-## Features
-
-- **Auto profile building** — Give a name or Twitter URL, get a structured profile
-- **Multi-source data** — Twitter (via bird CLI), LinkedIn, web search (DuckDuckGo)
-- **AI synthesis** — Claude CLI, Anthropic API, or GitHub Copilot CLI
-- **Auto monitoring** — Scheduled profile refresh with change detection (macOS launchd)
-- **Markdown output** — One `.md` file per person, easy to read and edit
-
 ## Install
 
 ```bash
-cd ~/Projects/vip-crm
-pip install -e .
+npm install -g vipcare
+```
+
+Or run directly:
+
+```bash
+npx vipcare --help
 ```
 
 ## Quick Start
@@ -39,11 +36,19 @@ vip search "AI"
 vip edit sam-altman --note "Met at conference"
 
 # Delete a profile
-vip rm sam-altman
+vip rm sam-altman -y
 
 # Refresh a profile
 vip update sam-altman
 ```
+
+## Features
+
+- **Auto profile building** — Give a name or URL, get a structured profile
+- **Multi-source data** — Twitter (via [bird CLI](https://github.com/nickytonline/bird)), LinkedIn, web search
+- **AI synthesis** — Claude CLI, Anthropic API, or GitHub Copilot CLI
+- **Auto monitoring** — Scheduled profile refresh with change detection (macOS launchd)
+- **Markdown output** — One `.md` file per person
 
 ## AI Backend
 
@@ -55,34 +60,29 @@ Auto-detected in this order:
 | Claude CLI | Install [Claude Code](https://claude.ai/code) |
 | GitHub Copilot | Install `gh copilot` |
 
-Override with `VIP_AI_BACKEND=anthropic` or set `ai_backend` in config.
+Override: `VIP_AI_BACKEND=anthropic vip add "Name"`
 
 ## Claude Code Skill
 
-VIPCare includes a `/vip` slash command for Claude Code. Install the skill:
+Install the `/vip` slash command for Claude Code:
 
 ```bash
 cp skill/vip.md ~/.claude/commands/vip.md
 ```
 
-Then use natural language in Claude Code:
+Then use natural language:
 
 ```
 /vip add Jensen Huang from NVIDIA
-/vip list
-/vip show sam
 /vip who works in AI?
 /vip compare Sam Altman and Elon Musk
-/vip add a note to sam: met at dinner last week
-/vip add these people: Tim Cook, Sundar Pichai, Satya Nadella
+/vip add a note to sam: met at dinner
 ```
-
-The skill combines the `vip` CLI (data fetching) with Claude's intelligence (synthesis, analysis, comparison).
 
 ## Monitoring
 
 ```bash
-vip monitor start    # Start auto-refresh (launchd, every 24h)
+vip monitor start    # Start auto-refresh (every 24h)
 vip monitor stop     # Stop
 vip monitor status   # Check status
 vip monitor run      # Run once now
@@ -92,14 +92,7 @@ vip digest           # View recent changes
 ## Config
 
 ```bash
-vip config           # View and edit settings
+vip config           # View settings
 ```
 
-Settings stored in `~/.vip-crm/config.json`. Profiles in `~/Projects/vip-crm/profiles/`.
-
-## Dependencies
-
-- `click` — CLI framework
-- `ddgs` — DuckDuckGo search (no API key)
-- `requests` — HTTP
-- [bird CLI](https://github.com/steipete/bird) — Twitter data (optional)
+Settings: `~/.vip-crm/config.json` | Profiles: `~/Projects/vip-crm/profiles/`
