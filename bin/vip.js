@@ -980,6 +980,27 @@ program.command('compare')
     if (unique1.length) console.log(`${c.cyan(`Unique to ${name1Display}:`)} ${unique1.join(', ')}`);
     if (unique2.length) console.log(`${c.cyan(`Unique to ${name2Display}:`)} ${unique2.join(', ')}`);
     if (!shared.length && !unique1.length && !unique2.length) console.log(c.dim('No tags to compare.'));
+
+    // Scores comparison (if VIP_DATA available)
+    const scores1 = p1.scores;
+    const scores2 = p2.scores;
+    if (scores1 && scores2) {
+      console.log();
+      console.log(c.bold('Personality Scores:'));
+      const dims = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'resilience', 'decision_style', 'risk_appetite', 'communication', 'influence', 'leadership'];
+      const maxLabel = Math.max(...dims.map(d => d.length));
+      for (const dim of dims) {
+        const s1 = scores1[dim] ?? 0;
+        const s2 = scores2[dim] ?? 0;
+        const label = dim.replace(/_/g, ' ').padEnd(maxLabel + 2);
+        const bar1 = '█'.repeat(s1) + '░'.repeat(5 - s1);
+        const bar2 = '█'.repeat(s2) + '░'.repeat(5 - s2);
+        const diff = s1 - s2;
+        const diffStr = diff > 0 ? c.green(`+${diff}`) : diff < 0 ? c.red(`${diff}`) : c.dim('=');
+        console.log(`  ${c.dim(label)} ${bar1} ${s1}  vs  ${bar2} ${s2}  ${diffStr}`);
+      }
+    }
+
     console.log();
   });
 
