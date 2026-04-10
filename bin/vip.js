@@ -530,6 +530,8 @@ program.command('update')
   .description('Refresh an existing profile')
   .argument('<name>')
   .option('--no-ai', 'Skip AI synthesis')
+  .option('--dry-run', 'Preview updated profile without saving')
+  .option('--youtube <url>', 'Include YouTube transcript as additional data source')
   .action(async (name, opts) => {
     const content = loadProfile(name);
     if (!content) { console.error(c.red(`Profile not found: ${name}`)); process.exit(1); }
@@ -547,20 +549,45 @@ program.command('update')
     if (meta.linkedinUrl) person.linkedinUrl = person.linkedinUrl || meta.linkedinUrl;
 
     const [rawData, sources] = gatherData(person);
-    if (!rawData.trim()) { console.log(c.yellow('No new data found.')); return; }
+
+    // Add YouTube transcript if provided
+    let extraData = '';
+    if (opts.youtube) {
+      const stop3 = spinner('Transcribing YouTube video...');
+      try {
+        const transcript = youtube.transcribe(opts.youtube);
+        extraData = `\n\n--- YouTube Transcript ---\n${transcript}`;
+        sources.push(`YouTube: ${opts.youtube}`);
+      } catch (e) {
+        console.log(c.yellow(`YouTube transcription failed: ${e.message}`));
+      } finally { stop3(); }
+    }
+
+    const allData = rawData + extraData;
+    if (!allData.trim()) { console.log(c.yellow('No new data found.')); return; }
+
+    // Include existing profile as context for richer synthesis
+    const contextNote = `\n\n--- Existing Profile (for context, merge and enhance) ---\n${content}`;
 
     let profile;
     if (opts.ai === false) {
-      profile = `# ${personName}\n\n## Raw Data\n\n${rawData}`;
+      profile = `# ${personName}\n\n## Raw Data\n\n${allData}`;
     } else {
-      const stop2 = spinner('Re-synthesizing profile...');
+      const stop2 = spinner('Re-synthesizing profile with full template...');
       try {
-        profile = await synthesizeProfile(rawData, sources);
+        profile = await synthesizeProfile(allData + contextNote, sources);
       } catch (e) {
         console.error(c.red(`AI synthesis failed: ${e.message}`));
         console.error(c.dim('Use --no-ai to save raw data without synthesis.'));
         process.exit(1);
       } finally { stop2(); }
+    }
+
+    if (opts.dryRun) {
+      console.log(c.cyan('\n--- Dry Run Preview ---\n'));
+      console.log(profile);
+      console.log(c.dim('\n(Not saved. Remove --dry-run to write.)'));
+      return;
     }
 
     const filepath = saveProfile(personName, profile);
